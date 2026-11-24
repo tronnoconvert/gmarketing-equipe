@@ -1,0 +1,49 @@
+<title>Torre de Controle</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>
+__CSS__
+</style>
+<button type="button" class="menu-tg" id="menu-tg" aria-controls="side" aria-expanded="true" aria-label="Esconder menu lateral" title="Esconder menu lateral">__IC_chev__</button>
+<div class="app">
+ <aside class="side" id="side" aria-label="Menu">
+  <a class="brand" href="#quadro"><span class="brand-mk">__IC_radar__</span><b>Torre</b><small>Meta Ads</small></a>
+  <div class="ucard"><div class="me" id="me"></div><label class="lbl" for="user">Ver como</label><select id="user"></select></div>
+  <nav class="nav" id="nav" aria-label="Visões"></nav>
+  <div class="side-foot">
+   <div class="rot" aria-label="Rotina diária"><div class="row" style="justify-content:space-between"><b>Revisão diária</b><span class="hint">06:00</span></div><div class="bar1"><i style="width:93%"></i></div><span class="hint">28 de 30 contas revisadas · 1 com erro · 1 aguardando</span></div>
+  </div>
+ </aside>
+ <div class="main">
+  <div class="sheet">
+   <header class="top">
+    <button class="ib hamb" id="hamb" aria-label="Abrir menu">__IC_menu__</button>
+    <nav class="etabs" id="etabs" aria-label="Seções do Painel de Voo"></nav>
+    <div class="crumb">__IC_layers__<span>Torre de Controle</span><span>›</span><b>Painel de Voo</b></div>
+    <div class="top-r">
+     <span class="tema" role="group" aria-label="Tema da tela"><button type="button" data-tema-set="claro">Claro</button><button type="button" data-tema-set="escuro">Escuro</button></span>
+     <span class="chip" title="Última leitura dos dados do Meta">__IC_clock__<span class="chip-l">Dados do Meta · </span>23/11/2026, 21:20</span>
+     <span class="rel" id="bell-w"><button class="ib" id="bell" aria-label="Alertas">__IC_bell__<span class="dot-n" id="bell-n" hidden></span></button></span>
+    </div>
+   </header>
+   <div id="alarm" class="alarm" role="alert" hidden style="margin:12px 22px 0"></div>
+   <section id="board" aria-label="Visão do dia e Painel de Voo"></section>
+  </div>
+ </div>
+</div>
+<div id="full" class="full" hidden role="dialog" aria-label="Conta"></div>
+<div id="scrim" class="scrim" hidden></div><div id="modal" class="modal" hidden></div>
+<div id="toasts" class="toasts" aria-live="polite"></div>
+<div id="tip" class="tipbox" role="tooltip" hidden></div>
+<script>
+(function(){const H=document.documentElement;let q;try{q=new URLSearchParams(location.search)}catch(e){q={get:()=>null}}
+let emb=q.get("embed")==="1";window.EMBED=emb;if(emb)H.dataset.embed="1";
+let m="aberto";try{m=localStorage.getItem(emb?"torre-menu-embed":"torre-menu")||(emb?"fechado":"aberto")}catch(e){m=emb?"fechado":"aberto"}H.dataset.menu=m;
+let t=window.TEMA_PADRAO||"claro";const qt=q.get("tema");if(qt==="claro"||qt==="escuro")t=qt;else if(!emb){try{t=localStorage.getItem("torre-tema")||t}catch(e){}}H.dataset.tema=t})();
+__JS__
+;(function(){const H=document.documentElement,b=document.getElementById("menu-tg");if(!b)return;
+const sync=()=>{const ab=H.dataset.menu!=="fechado";b.setAttribute("aria-expanded",String(ab));const r=ab?"Esconder menu lateral":"Mostrar menu lateral";b.setAttribute("aria-label",r);b.title=r};
+sync();b.addEventListener("click",e=>{e.stopPropagation();H.dataset.menu=H.dataset.menu==="fechado"?"aberto":"fechado";try{localStorage.setItem(window.EMBED?"torre-menu-embed":"torre-menu",H.dataset.menu)}catch(_){}sync()});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&window.EMBED&&H.dataset.menu==="aberto"&&innerWidth<=900){H.dataset.menu="fechado";sync()}})})();
+</script>

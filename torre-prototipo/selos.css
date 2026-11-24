@@ -1,0 +1,75 @@
+
+/* ===== Fundo tingido: janelas brancas flutuando ===== */
+:root{--bg:#E8EBF3}
+.sheet{background:#F1F3F9;border-color:transparent;box-shadow:0 1px 2px rgba(16,24,64,.04)}
+.top{background:rgba(241,243,249,.9)}
+.glass{border-color:rgba(16,24,64,.05);box-shadow:0 1px 2px rgba(16,24,64,.04),0 8px 24px -6px rgba(16,24,64,.08)}
+.ucard,.rot{border-color:rgba(16,24,64,.05);box-shadow:0 1px 2px rgba(16,24,64,.04),0 6px 18px -6px rgba(16,24,64,.08)}
+html[data-tema="escuro"]{--bg:#060E1E}
+html[data-tema="escuro"] .sheet{background:#0A1429;border-color:rgba(140,180,255,.06)}
+html[data-tema="escuro"] .top{background:rgba(10,20,41,.92)}
+html[data-tema="escuro"] .glass{background:#111F3A;border-color:rgba(140,180,255,.08);box-shadow:0 1px 2px rgba(0,0,0,.3),0 10px 28px -8px rgba(0,0,0,.5)}
+
+/* ===== Selos de status: modelo único "A · Marcador" (ponto de cor + texto, sem caixa). html:root tem a mesma especificidade dos antigos html[data-selo]. ===== */
+html:root .pill{--tc:#98A2B3;--tt:var(--fg2)}
+html:root .pill.ok,html:root .s-exc,html:root .s-bom{--tc:#12B76A;--tt:#067647}
+html:root .pill.warn,html:root .s-aten{--tc:#F79009;--tt:#B54708}
+html:root .s-caro{--tc:#EF6820;--tt:#B93815}
+html:root .pill.bad,html:root .s-crit{--tc:#D92D20;--tt:#B42318}
+html:root .pill.acc{--tc:var(--fill);--tt:var(--ink)}
+html:root .s-par{--tc:#344054;--tt:#344054}
+html:root .s-sem,html:root .s-ins{--tc:#98A2B3;--tt:var(--fg2)}
+html[data-tema="escuro"]:root .pill{--tt:var(--fg2)}
+html[data-tema="escuro"]:root .pill.ok,html[data-tema="escuro"]:root .s-exc,html[data-tema="escuro"]:root .s-bom{--tc:#32D583;--tt:#75E0A7}
+html[data-tema="escuro"]:root .pill.warn,html[data-tema="escuro"]:root .s-aten{--tc:#FDB022;--tt:#FEC84B}
+html[data-tema="escuro"]:root .pill.bad,html[data-tema="escuro"]:root .s-crit{--tc:#F97066;--tt:#FDA29B}
+html[data-tema="escuro"]:root .s-caro{--tc:#F38744;--tt:#F7B27A}
+html[data-tema="escuro"]:root .s-par{--tc:#D0D5DD;--tt:#D0D5DD}
+.par .pill{--tc:#D0D5DD!important;--tt:#F3F4F6!important}
+
+/* A · Marcador discreto: sem caixa, só um ponto de cor + texto. Ação vira comando com seta. */
+html:root .pill{background:none!important;border:0!important;padding:0;border-radius:0;gap:7px;color:var(--fg)!important;font-weight:500;font-size:.8rem}
+html:root .pill i{width:8px;height:8px;border-radius:50%;background:var(--tc)!important;border:0!important;box-shadow:none}
+html:root .pill.s-crit i,html:root .pill.bad i{box-shadow:0 0 0 3px color-mix(in srgb,var(--tc) 22%,transparent)}
+html:root .pill.s-par i{border-radius:2px}
+html:root .pill.acc{color:var(--tt)!important;font-weight:600}
+html:root .pill.acc i{width:12px;height:12px;border-radius:0;box-shadow:none;-webkit-mask:var(--mk-arrow) center/contain no-repeat;mask:var(--mk-arrow) center/contain no-repeat}
+html:root .par .pill{color:#F3F4F6!important}
+
+:root{
+ --mk-arrow:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12h14M13 6l6 6-6 6'/%3E%3C/svg%3E");}
+
+html[data-tema="escuro"]:root .pill.acc{--tc:var(--fill);--tt:var(--ink)}
+
+/* "Por quê" recolhido na fila: abre com um clique e fica aberto */
+.qi-wbtn{display:inline-flex;align-items:center;gap:5px;width:max-content;margin-top:2px;padding:3px 9px 3px 6px;border:1px solid var(--line-2);border-radius:7px;background:var(--sheet);color:var(--fg2);font-size:.76rem;font-weight:600;cursor:pointer}
+.qi-wbtn .ic{width:13px;height:13px;transform:rotate(90deg);color:var(--ink)}
+.qi-wbtn:hover{border-color:var(--fill);color:var(--ink)}
+.qi.par .qi-wbtn{background:#1F242D;color:#E5E7EB;border-color:#3A404B}
+.qi-why-in{animation:qwIn .22s ease-out}
+@keyframes qwIn{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.qi-why-in{animation:none}}
+/* semáforo maior: nome e bolinha mais visíveis */
+.pill.sem{font-size:.86rem;font-weight:600;padding:3px 11px;gap:8px}
+.pill.sem i{width:11px;height:11px}
+html:root .pill.sem{font-size:.92rem;font-weight:600;gap:9px}
+html:root .pill.sem i{width:12px;height:12px}
+/* rótulos longos do semáforo na fila quebram linha em vez de invadir a coluna ao lado */
+.qi-s{min-width:0}
+.qi-s .pill.sem{white-space:normal;align-items:flex-start;line-height:1.25;max-width:100%}
+.qi-s .pill.sem i{margin-top:.22em}
+
+/* frase do investimento diário total */
+.inv{display:flex;gap:8px;align-items:flex-start;padding:8px 10px;border-radius:8px;background:var(--panel-solid-2);border:1px solid var(--line);font-size:.8rem;line-height:1.45;color:var(--fg2)}
+.inv .ic{width:15px;height:15px;margin-top:1px;color:var(--ink);flex:none}
+.inv b{color:var(--fg)}
+.inv .inv-t{color:var(--muted);white-space:nowrap}
+.inv.over{background:#FEF3F2;border-color:#FECDCA;color:#7A271A}
+.inv.over .ic,.inv.over .inv-t{color:#B42318;font-weight:600;white-space:normal}
+html[data-tema="escuro"] .inv.over{background:rgba(249,112,102,.12);border-color:#7A2E2A;color:#FDA29B}
+html[data-tema="escuro"] .inv.over .ic,html[data-tema="escuro"] .inv.over .inv-t{color:#FDA29B}
+.qi-inv{padding:4px 0 0;background:none;border:0;font-size:.76rem}
+.qi-inv.over{padding:6px 8px;border:1px solid #FECDCA;background:#FEF3F2}
+html[data-tema="escuro"] .qi-inv.over{border-color:#7A2E2A;background:rgba(249,112,102,.12)}
+.qi.par .qi-inv{color:#E5E7EB}.qi.par .qi-inv b{color:#fff}
+.mbox .inv{margin-top:2px}

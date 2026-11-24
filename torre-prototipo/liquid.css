@@ -1,0 +1,106 @@
+
+/* ===== Liquid Glass (camada experimental) ===== */
+:root{
+ --lg-tint:rgba(255,255,255,.52);--lg-tint-2:rgba(255,255,255,.68);--lg-solid:rgba(255,255,255,.86);
+ --lg-rim:rgba(255,255,255,.75);--lg-rim-2:rgba(255,255,255,.35);
+ --lg-shadow:0 10px 34px rgba(16,48,96,.13),0 2px 6px rgba(16,48,96,.06);
+ --lg-spec:inset 0 1px 0 rgba(255,255,255,.95),inset 1px 0 0 rgba(255,255,255,.45),inset 0 -1px 0 rgba(255,255,255,.25),inset 0 -14px 24px -18px rgba(255,255,255,.9);
+ --line:rgba(20,40,80,.10);--line-2:rgba(20,40,80,.16);
+ --sheet:var(--lg-tint-2);--panel-solid-2:rgba(255,255,255,.55);--glass-hi:rgba(255,255,255,.5)}
+html[data-tema="escuro"]{
+ --lg-tint:rgba(22,40,74,.42);--lg-tint-2:rgba(26,46,84,.55);--lg-solid:rgba(16,30,58,.9);
+ --lg-rim:rgba(160,200,255,.28);--lg-rim-2:rgba(160,200,255,.10);
+ --lg-shadow:0 12px 38px rgba(0,0,0,.38),0 2px 6px rgba(0,0,0,.2);
+ --lg-spec:inset 0 1px 0 rgba(190,220,255,.32),inset 1px 0 0 rgba(190,220,255,.12),inset 0 -1px 0 rgba(190,220,255,.06),inset 0 -14px 24px -18px rgba(120,170,255,.25);
+ --line:rgba(170,200,255,.12);--line-2:rgba(170,200,255,.2);
+ --sheet:var(--lg-tint-2);--panel-solid-2:rgba(30,52,92,.5);--glass-hi:rgba(60,90,140,.35)}
+
+/* papel de parede: o vidro precisa de cor atrás para aparecer */
+body{background:#DDE9F8;background-image:
+ radial-gradient(900px 640px at 8% 6%,rgba(90,180,255,.55),transparent 60%),
+ radial-gradient(760px 560px at 92% 12%,rgba(255,196,150,.50),transparent 62%),
+ radial-gradient(820px 620px at 70% 88%,rgba(120,220,200,.42),transparent 60%),
+ radial-gradient(700px 520px at 18% 92%,rgba(11,107,232,.30),transparent 62%);
+ background-attachment:fixed}
+html[data-tema="escuro"] body{background:#07112A;background-image:
+ radial-gradient(900px 640px at 8% 6%,rgba(11,107,232,.45),transparent 60%),
+ radial-gradient(760px 560px at 92% 14%,rgba(40,170,200,.28),transparent 62%),
+ radial-gradient(820px 620px at 70% 90%,rgba(61,155,255,.26),transparent 60%),
+ radial-gradient(700px 520px at 16% 94%,rgba(255,150,90,.14),transparent 62%);
+ background-attachment:fixed}
+
+/* folha principal: vidro grande, bem translúcido */
+.sheet{background:rgba(255,255,255,.30);border:1px solid var(--lg-rim);box-shadow:var(--lg-spec),var(--lg-shadow);
+ -webkit-backdrop-filter:blur(28px) saturate(170%);backdrop-filter:blur(28px) saturate(170%)}
+html[data-tema="escuro"] .sheet{background:rgba(14,28,56,.38)}
+
+/* janelas (cards) dentro da folha */
+.glass,.ucard,.rot,.kx-b,.nd,.tile,.champ,.crc-i{background:var(--lg-tint-2);border-color:var(--lg-rim);box-shadow:var(--lg-spec),0 6px 20px rgba(16,48,96,.08)}
+html[data-tema="escuro"] .glass,html[data-tema="escuro"] .ucard,html[data-tema="escuro"] .rot,html[data-tema="escuro"] .kx-b,html[data-tema="escuro"] .nd,html[data-tema="escuro"] .tile,html[data-tema="escuro"] .champ,html[data-tema="escuro"] .crc-i{box-shadow:var(--lg-spec),0 6px 20px rgba(0,0,0,.25)}
+.ucard,.rot{-webkit-backdrop-filter:blur(22px) saturate(170%);backdrop-filter:blur(22px) saturate(170%);background:var(--lg-tint)}
+.glass{border-radius:18px}
+/* reflexo especular na borda de cima das janelas */
+.glass::before{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+ background:linear-gradient(180deg,rgba(255,255,255,.55) 0,rgba(255,255,255,0) 38px);opacity:.7}
+html[data-tema="escuro"] .glass::before{background:linear-gradient(180deg,rgba(170,210,255,.12) 0,rgba(170,210,255,0) 38px)}
+.glass>*{position:relative}
+
+/* barra do topo */
+.top{background:linear-gradient(180deg,rgba(255,255,255,.9),rgba(255,255,255,.8));-webkit-backdrop-filter:blur(24px) saturate(180%);backdrop-filter:blur(24px) saturate(180%);border-bottom-color:var(--lg-rim);box-shadow:inset 0 -1px 0 rgba(255,255,255,.4)}
+html[data-tema="escuro"] .top{background:linear-gradient(180deg,rgba(16,30,58,.94),rgba(14,28,56,.86));box-shadow:inset 0 -1px 0 rgba(160,200,255,.08)}
+
+/* menu lateral: item ativo como cápsula de vidro */
+.nav a[aria-current]{background:var(--lg-tint-2);box-shadow:var(--lg-spec),0 4px 14px rgba(16,48,96,.10),inset 0 0 0 1px var(--lg-rim)}
+
+/* botões e controles: cápsulas de vidro */
+.btn,.ib,.chip,.cchip,.cp,.per .tab,.hq{background:rgba(255,255,255,.55);border-color:var(--lg-rim);box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 2px 8px rgba(16,48,96,.07);
+ -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
+html[data-tema="escuro"] .btn,html[data-tema="escuro"] .ib,html[data-tema="escuro"] .chip,html[data-tema="escuro"] .cchip,html[data-tema="escuro"] .cp,html[data-tema="escuro"] .per .tab,html[data-tema="escuro"] .hq{background:rgba(40,64,110,.45);box-shadow:inset 0 1px 0 rgba(190,220,255,.18),0 2px 8px rgba(0,0,0,.2)}
+.btn:hover,.ib:hover{background:rgba(255,255,255,.78)}
+html[data-tema="escuro"] .btn:hover,html[data-tema="escuro"] .ib:hover{background:rgba(60,90,140,.55)}
+.btn.pri{background:linear-gradient(180deg,#3A8DFF 0%,#0B6BE8 100%);border-color:rgba(255,255,255,.35);
+ box-shadow:inset 0 1px 0 rgba(255,255,255,.55),inset 0 -2px 6px rgba(0,40,120,.25),0 6px 18px rgba(11,107,232,.35)}
+.btn.pri:hover{background:linear-gradient(180deg,#4C98FF 0%,#0A5FCC 100%)}
+html[data-tema="escuro"] .btn.pri{background:linear-gradient(180deg,#7CC0FF 0%,#3D9BFF 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),0 6px 18px rgba(61,155,255,.35)}
+.btn.stop{background:linear-gradient(180deg,#E0524A 0%,#C9362E 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,.45),0 6px 16px rgba(201,54,46,.3)}
+.btn.go{background:linear-gradient(180deg,#2FA872 0%,#1F8A5B 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,.45),0 6px 16px rgba(31,138,91,.3)}
+.btn.stop:disabled,.btn.go:disabled,.btn.pri:disabled{background:rgba(255,255,255,.45);box-shadow:none}
+html[data-tema="escuro"] .btn.stop:disabled,html[data-tema="escuro"] .btn.go:disabled,html[data-tema="escuro"] .btn.pri:disabled{background:rgba(40,64,110,.4)}
+.segt,.tema{background:rgba(255,255,255,.35);box-shadow:inset 0 1px 2px rgba(16,48,96,.08)}
+html[data-tema="escuro"] .segt,html[data-tema="escuro"] .tema{background:rgba(10,20,40,.35)}
+.segt .tab[aria-selected="true"],.tema button[aria-pressed="true"]{background:rgba(255,255,255,.85);box-shadow:inset 0 1px 0 #fff,0 2px 8px rgba(16,48,96,.12)}
+html[data-tema="escuro"] .segt .tab[aria-selected="true"],html[data-tema="escuro"] .tema button[aria-pressed="true"]{background:rgba(70,105,160,.6);box-shadow:inset 0 1px 0 rgba(190,220,255,.3)}
+input,select,textarea{background:rgba(255,255,255,.62);border-color:var(--line-2)}
+html[data-tema="escuro"] input,html[data-tema="escuro"] select,html[data-tema="escuro"] textarea{background:rgba(10,20,40,.45)}
+
+/* fila "Comece por aqui" */
+.qi{border-top-color:var(--line)}
+.qi-why,.why{background:rgba(255,255,255,.5)}
+html[data-tema="escuro"] .qi-why,html[data-tema="escuro"] .why{background:rgba(10,20,40,.35)}
+.alc{background:linear-gradient(160deg,rgba(234,244,255,.75) 0%,rgba(200,226,255,.6) 100%);border-color:var(--lg-rim);box-shadow:var(--lg-spec)}
+html[data-tema="escuro"] .alc{background:linear-gradient(160deg,rgba(16,40,74,.7) 0%,rgba(15,31,61,.6) 100%)}
+
+/* Painel de Voo: cabeçalho e 1ª coluna fixos precisam ser quase opacos (o texto rola por baixo) */
+.q thead th,.q thead .fix{background:var(--lg-solid);-webkit-backdrop-filter:blur(18px) saturate(160%);backdrop-filter:blur(18px) saturate(160%)}
+.q thead tr.g th,.q thead tr.g .fix{background:rgba(232,242,255,.92)}
+html[data-tema="escuro"] .q thead tr.g th,html[data-tema="escuro"] .q thead tr.g .fix{background:rgba(18,40,74,.94)}
+.q .fix{background:var(--lg-solid);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px)}
+.q tbody tr.r:hover td{background:rgba(255,255,255,.55)}
+.q tbody tr.r.open td{background:rgba(232,242,255,.8)}
+html[data-tema="escuro"] .q tbody tr.r:hover td{background:rgba(60,90,140,.3)}
+html[data-tema="escuro"] .q tbody tr.r.open td{background:rgba(18,40,74,.85)}
+
+/* janelas que abrem por cima: vidro mais denso */
+.mbox,.pop,.bellp,.ptip{background:rgba(255,255,255,.72);border-color:var(--lg-rim);
+ -webkit-backdrop-filter:blur(30px) saturate(180%);backdrop-filter:blur(30px) saturate(180%);
+ box-shadow:var(--lg-spec),0 24px 60px rgba(16,48,96,.22)}
+html[data-tema="escuro"] .mbox,html[data-tema="escuro"] .pop,html[data-tema="escuro"] .bellp,html[data-tema="escuro"] .ptip{background:rgba(16,30,58,.78);box-shadow:var(--lg-spec),0 24px 60px rgba(0,0,0,.5)}
+.mbox{border-radius:22px}
+
+/* sem suporte a blur: volta para superfícies sólidas legíveis */
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+ .sheet,.mbox,.pop,.bellp,.top{background:#fff}
+ html[data-tema="escuro"] .sheet,html[data-tema="escuro"] .mbox,html[data-tema="escuro"] .pop,html[data-tema="escuro"] .bellp,html[data-tema="escuro"] .top{background:#101C33}}
+@media (prefers-reduced-transparency:reduce){
+ .sheet,.mbox,.pop,.bellp,.top{background:#fff;backdrop-filter:none;-webkit-backdrop-filter:none}
+ html[data-tema="escuro"] .sheet,html[data-tema="escuro"] .mbox,html[data-tema="escuro"] .pop,html[data-tema="escuro"] .bellp,html[data-tema="escuro"] .top{background:#101C33}}

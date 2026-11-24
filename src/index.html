@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="pt-BR" data-tema="claro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#F1F3F9">
+<meta name="color-scheme" content="light dark">
+<meta name="description" content="Agência OS — painel de controle da agência: receita, clientes, operação, equipe e tráfego.">
+<title>Agência OS</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%235AB4FF'/%3E%3Cstop offset='1' stop-color='%230B6BE8'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='8' fill='url(%23g)'/%3E%3Ccircle cx='16' cy='16' r='7' fill='none' stroke='white' stroke-width='2.4'/%3E%3Ccircle cx='16' cy='16' r='2.4' fill='white'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400..700&display=swap">
+<script>
+  // tema antes do primeiro paint + configuração padrão (sem Supabase = modo demonstração)
+  try { if (localStorage.getItem('aos-tema') === 'escuro') document.documentElement.dataset.tema = 'escuro'; } catch (e) {}
+  window.AOS_CONFIG = window.AOS_CONFIG || {};
+</script>
+<!--AOS:CONFIG--><script src="config.js"></script><!--/AOS:CONFIG-->
+<!--AOS:CSS--><link rel="stylesheet" href="app.css"><!--/AOS:CSS-->
+</head>
+<body>
+<div id="app" aria-live="off"></div>
+<noscript><p style="padding:24px;font-family:sans-serif">O Agência OS precisa de JavaScript habilitado.</p></noscript>
+<!--AOS:JS--><script src="app.js"></script><!--/AOS:JS-->
+</body>
+</html>

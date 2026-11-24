@@ -1,0 +1,78 @@
+/* cockpit — prefixo .m-cockpit / .ck- */
+.m-cockpit{gap:16px}
+.m-cockpit .ck-hd{display:flex;align-items:flex-end;justify-content:space-between;gap:8px 20px;flex-wrap:wrap}
+.m-cockpit .ck-hd h1{font-size:22px;line-height:1.25;font-weight:650;letter-spacing:-.02em}
+.m-cockpit .ck-hd-t p{display:flex;align-items:center;gap:8px;margin-top:4px;color:var(--fg2);font-size:14px}
+.m-cockpit .ck-hd-t p b{font-weight:600;color:var(--fg)}
+.m-cockpit .ck-hd-m{display:flex;gap:6px;flex-wrap:wrap}
+.m-cockpit .ck-kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:14px}
+.m-cockpit .ck-kpis .kpi{padding:13px 16px 12px}
+.m-cockpit .ck-kpis .kpi-v{font-size:23px;margin-top:4px}
+.m-cockpit .ck-kpis .kpi-s{margin-top:8px;height:28px}
+.m-cockpit .ck-kpis .kpi-s svg{height:28px}
+@media (max-width:1280px){.m-cockpit .ck-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:560px){.m-cockpit .ck-kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.m-cockpit .ck-kpis .kpi-v{font-size:19px}}
+
+.m-cockpit .ck-r1{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:900px){.m-cockpit .ck-r1{grid-template-columns:minmax(0,1fr)}}
+.m-cockpit .ck-hoje{box-shadow:inset 0 3px 0 var(--err),var(--sh)}
+.m-cockpit .ck-lst .lst-i{padding:10px 0;gap:12px}
+.m-cockpit .ck-lst .lst-i:first-child{padding-top:2px}
+.m-cockpit .ck-it-a{display:flex;align-items:center;gap:6px;flex:none}
+.m-cockpit .ck-it-a .btn{min-width:108px;justify-content:center}
+.m-cockpit .ck-it-a .ib{color:var(--muted)}
+.m-cockpit .ck-it-a .ib:hover:not([disabled]){color:var(--ok-t)}
+.m-cockpit .ck-it-a .ib[disabled]{opacity:.45;cursor:not-allowed}
+@media (max-width:560px){.m-cockpit .ck-it{flex-wrap:wrap}.m-cockpit .ck-it-a{width:100%;padding-left:32px}.m-cockpit .ck-it-a .btn{flex:1}}
+.m-cockpit .ck-feitos{margin-top:10px;border-top:1px solid var(--line);padding-top:8px;font-size:13px}
+.m-cockpit .ck-feitos summary{cursor:pointer;color:var(--muted);display:flex;align-items:center;gap:6px;list-style:none;padding:4px 0;width:max-content}
+.m-cockpit .ck-feitos summary::-webkit-details-marker{display:none}
+.m-cockpit .ck-feitos summary .ic{width:15px;height:15px;color:var(--ok)}
+.m-cockpit .ck-fl{list-style:none;margin:4px 0 0;padding:0;display:grid;gap:4px}
+.m-cockpit .ck-fl li{display:flex;align-items:center;gap:10px;min-width:0}
+.m-cockpit .ck-fl li>.trunc{flex:1;min-width:0}
+.m-cockpit .ck-fl s{color:var(--muted)}
+
+.m-cockpit .ck-saude .ch-gauge{display:grid;place-items:center}
+.m-cockpit .ck-comp{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:4px}
+.m-cockpit .ck-comp a{display:grid;gap:5px;padding:6px 8px;margin:0 -8px;border-radius:var(--r-sm);color:var(--fg)}
+.m-cockpit .ck-comp a:hover{background:var(--bg-h);text-decoration:none}
+
+.m-cockpit .ck-torre{list-style:none;margin:0;padding:0}
+.m-cockpit .ck-torre a{display:flex;align-items:center;gap:10px;padding:8px 8px;margin:0 -8px;border-radius:var(--r-sm);color:var(--fg);font-size:13.5px;min-width:0}
+.m-cockpit .ck-torre a:hover{background:var(--bg-h);text-decoration:none}
+.m-cockpit .ck-torre .trunc{flex:1;min-width:0}
+.m-cockpit .ck-tt{font-size:12.5px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.m-cockpit .t-warn{color:var(--warn-t)}
+
+.m-cockpit .ck-leds{display:flex;flex-wrap:wrap;gap:4px 6px;margin-top:10px;padding-top:12px;border-top:1px solid var(--line)}
+.m-cockpit .ck-leds a{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:6px;font-size:12.5px;color:var(--fg2)}
+.m-cockpit .ck-leds a:hover{background:var(--bg-h);text-decoration:none}
+.m-cockpit .ck-leds b{font-weight:600;color:var(--muted)}
+.m-cockpit .ck-leds .ck-outros{color:var(--fg)}
+
+.m-cockpit .ck-cap{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+.m-cockpit .ck-cap a{display:grid;grid-template-columns:28px minmax(0,130px) minmax(0,1fr);align-items:center;gap:10px;padding:6px 8px;margin:0 -8px;border-radius:var(--r-sm);color:var(--fg)}
+.m-cockpit .ck-cap a:hover{background:var(--bg-h);text-decoration:none}
+.m-cockpit .ck-cap-n{display:grid;min-width:0;line-height:1.3}
+.m-cockpit .ck-cap-n b{font-size:13px;font-weight:600}
+
+.m-cockpit .ck-ren{list-style:none;margin:0;padding:0}
+.m-cockpit .ck-ren li+li{border-top:1px solid var(--line)}
+.m-cockpit .ck-ren a{display:flex;align-items:center;gap:12px;padding:9px 8px;margin:0 -8px;border-radius:var(--r-sm);color:var(--fg)}
+.m-cockpit .ck-ren a:hover{background:var(--bg-h);text-decoration:none}
+.m-cockpit .ck-ren-d{display:grid;place-items:center;width:40px;flex:none;line-height:1.1;border-radius:8px;background:var(--card-3);padding:5px 0}
+.m-cockpit .ck-ren-d b{font-size:15px}
+.m-cockpit .ck-ren-d span{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.m-cockpit .ck-ren-n{display:grid;flex:1;min-width:0}
+.m-cockpit .ck-ren-n b{font-size:13.5px;font-weight:600}
+.m-cockpit .ck-ren-v{display:flex;align-items:center;gap:10px;font-size:13px;white-space:nowrap}
+.m-cockpit .ck-st{gap:16px}
+.m-cockpit .card-h{flex-wrap:nowrap;align-items:flex-start}
+.m-cockpit .card-t{flex:1}
+.m-cockpit .card-a{padding-top:2px}
+.m-cockpit .ck-hd-t p .led{margin:0 2px 0 4px}
+.m-cockpit .ck-kpis .kpi-l{font-size:12px}
+.m-cockpit .ck-kpis .kpi-v{font-size:21px}
+@media (min-width:1500px){.m-cockpit .ck-kpis .kpi-v{font-size:24px}}
+.m-cockpit .card.np{display:block;max-height:none}

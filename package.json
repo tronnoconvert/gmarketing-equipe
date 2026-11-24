@@ -1,0 +1,16 @@
+{
+  "name": "agencia-os",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node tests/run.mjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "esbuild": "^0.23.1"
+  }
+}
