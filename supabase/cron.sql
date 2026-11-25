@@ -42,3 +42,9 @@ select cron.schedule('aos-monday-sync', '7 * * * *', $$select public.aos_chamar_
 -- Pausa automaticamente as campanhas de contas com incidente SUPREMO e vigia a quarentena (docs/SEGURANCA-INVASAO.md).
 select cron.unschedule('aos-guardiao') where exists (select 1 from cron.job where jobname = 'aos-guardiao');
 select cron.schedule('aos-guardiao', '*/2 * * * *', $$select public.aos_chamar_funcao('guardiao')$$);
+
+-- Painel de Voo (item 17): atualiza o cache da visão geral (dados do Meta via Windsor) a cada 5 minutos.
+-- O detalhe de cada cliente é buscado ao vivo quando alguém abre; sem este agendamento a visão geral se atualiza
+-- quando alguém abre o painel e o cache passou de 5 minutos (mostra o que tem e atualiza em segundo plano).
+select cron.unschedule('aos-voo-dados') where exists (select 1 from cron.job where jobname = 'aos-voo-dados');
+select cron.schedule('aos-voo-dados', '*/5 * * * *', $$select public.aos_chamar_funcao('voo-dados', '{"acao":"atualizar"}'::jsonb)$$);

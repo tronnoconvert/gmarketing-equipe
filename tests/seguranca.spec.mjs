@@ -29,7 +29,7 @@ export default async function (t) {
   await abrir();
   ok(!!(await page.$('[data-gt="simular"]')), 'Painel de Voo mostra "Simular invasão" para o dono (demonstração)');
   const contaId = CONTA;
-  await page.click('[data-gt="simular"]');
+  await page.$eval('[data-gt="simular"]', b => b.click());
   await page.waitForSelector('#aos-inv', { timeout: 4000 });
   await page.waitForTimeout(200);
   const txt = await page.textContent('#aos-inv');
@@ -83,7 +83,7 @@ export default async function (t) {
   step('reincidência reabre o alerta');
   await abrir();
   ok(await page.isVisible('.m-voo-qb'), 'conta continua em quarentena');
-  await page.click('[data-gt="reativar"]');
+  await page.$eval('[data-gt="reativar"]', b => b.click());
   await page.waitForSelector('#aos-inv', { timeout: 9000 });
   ok(/REINCIDÊNCIA/.test(await page.textContent('#aos-inv')) && (await sir()).tocando, 'reativação pelo invasor → pausa de novo, banner "REINCIDÊNCIA" e sirene (mesmo quem silenciou antes)');
   ok((await camps()).every(c => c.st !== 'ACTIVE'), 'Guardião pausou de novo');

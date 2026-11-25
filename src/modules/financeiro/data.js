@@ -22,7 +22,7 @@ export const CLIENTES = [
   { id: 'c-cafe', nome: 'Café Raiz', mrr: 3400, health: 61, resp: 't-bruno', serv: ['Social'] },
 ];
 export const OUTROS = { n: 31, mrr: 98300, health: 81 };
-export const nomeCliente = id => { const c = db.get('clients', id); if (c && (c.nome || c.fantasia)) return c.nome || c.fantasia; const k = CLIENTES.find(x => x.id === id); return k ? k.nome : null; };
+export const nomeCliente = id => { const c = db.get('clients', id); if (c && (c.nome || c.fantasia)) return c.nome || c.fantasia; const k = db.dadosDemo && CLIENTES.find(x => x.id === id); return k ? k.nome : null; };
 
 /* ---------- séries mensais (R$ mil) ---------- */
 export const MESES = ['Dez', 'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov'];

@@ -43,14 +43,13 @@ function pacoteDemo(soConta) {
   if (!demoBase) demoBase = gerarDemo(new Date());
   const b = JSON.parse(JSON.stringify(demoBase));
   const agora = Date.now();
+  for (const [id, m] of Object.entries(demoEst.mut)) if (m.novaCamp && !b.camps[id]) b.camps[id] = m.novaCamp;
   for (const [id, m] of Object.entries(demoEst.mut)) {
     if (m.visivelEm > agora) continue;
     const x = b.camps[id] || b.sets[id] || b.ads[id]; if (!x) continue;
     if (m.st) x.st = m.st;
     if (m.orc != null) x.orc = m.orc;
-    if (m.camp) b.camps[id] = { ...x, ...m.camp };
   }
-  for (const [id, m] of Object.entries(demoEst.mut)) if (m.novaCamp && !b.camps[id]) b.camps[id] = m.novaCamp;
   // escopo e receita como o servidor faz
   const clientes = db.list('clients');
   const ligada = new Map(); clientes.forEach(c => (c.metaContas || []).forEach(a => ligada.set(String(a).replace(/\D/g, ''), c)));
