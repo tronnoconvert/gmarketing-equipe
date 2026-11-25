@@ -135,7 +135,7 @@ export async function reconectar(integId) {
   const deps = db.list('routines', r => (r.integracoes || []).includes(integId));
   const corpo = `<div class="stack m-torre-oauth">
 <div class="m-torre-oauth-h"><span class="m-torre-oauth-ic">${ui.ic(it.icone || 'link')}</span><span class="m-torre-oauth-arrow">${ui.ic('arrow-right')}</span><span class="m-torre-oauth-ic acc">${ui.ic('radar')}</span></div>
-<p class="mb-txt">A <b>Agência OS</b> vai pedir acesso a <b>${fmt.esc(it.nome)}</b> (${fmt.esc(it.conta)}).</p>
+<p class="mb-txt">A <b>Gmarketing</b> vai pedir acesso a <b>${fmt.esc(it.nome)}</b> (${fmt.esc(it.conta)}).</p>
 ${ui.aviso({ tipo: 'info', titulo: 'Como funciona em produção', texto: `Este botão abre a tela de login do ${it.nome} em uma janela segura. Depois que você autoriza, o token é guardado no servidor (Supabase Edge Function), criptografado — nunca no navegador nem no código do app. Neste modo demonstração a autorização é simulada.` })}
 <div class="m-torre-oauth-p"><b>Permissões pedidas</b><ul>${(ESCOPOS[integId] || ['Leitura dos dados da conta', 'Atualização automática do token']).map(s => `<li>${ui.ic('check')}${fmt.esc(s)}</li>`).join('')}</ul></div>
 ${deps.length ? `<p class="sm mut">Rotinas que usam esta conexão: ${deps.map(d => fmt.esc(d.nome)).join(', ')}.</p>` : ''}

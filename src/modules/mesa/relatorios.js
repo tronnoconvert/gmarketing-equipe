@@ -68,7 +68,7 @@ export function garantirAvisoTerca(u = auth.real()) {
       db.setConfig(chave, s.semana);
     });
     return n;
-  } catch (e) { console.warn('[Agência OS] aviso de relatório', e && e.message); return null; }
+  } catch (e) { console.warn('[Gmarketing] aviso de relatório', e && e.message); return null; }
 }
 // no login (ou ao abrir o app já logado) numa terça, o gestor recebe o aviso
 auth.onChange(() => setTimeout(() => garantirAvisoTerca(), 0));

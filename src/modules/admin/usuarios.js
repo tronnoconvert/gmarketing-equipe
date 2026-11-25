@@ -159,7 +159,7 @@ async function desativar(ctx, id) {
   const u = db.get('users', id); if (!u) return;
   if (id === ctx.real.id) { ui.toast('Você não pode desativar o próprio acesso.', { tipo: 'warn' }); return; }
   if (u.papel === 'dono' && donosAtivos(db).length <= 1) { ui.toast('Não é possível desativar o único Dono ativo.', { tipo: 'err' }); return; }
-  const ok = await ui.confirmar(`${u.nome} não conseguirá mais entrar no Agência OS. Os dados, comentários e histórico dessa pessoa continuam salvos.`, { titulo: `Desativar o acesso de ${u.nome}?`, confirmar: 'Desativar acesso' });
+  const ok = await ui.confirmar(`${u.nome} não conseguirá mais entrar no Gmarketing. Os dados, comentários e histórico dessa pessoa continuam salvos.`, { titulo: `Desativar o acesso de ${u.nome}?`, confirmar: 'Desativar acesso' });
   if (!ok) return;
   if (db.mode === 'supabase') { if (!(await ativoServidor(ctx, id, false))) return; }
   setTimeout(() => ctx.refresh(), 0);
@@ -265,7 +265,7 @@ ${db.mode === 'supabase' ? ui.aviso({ tipo: 'info', texto: 'A pessoa recebe um e
   });
   if (!ok || !criado) return;
   if (criado.servidor) { ui.toast(`Convite enviado para ${criado.email}.`); return; }
-  ctx.notify.enviar({ para: [criado.u.id], tipo: 'sistema', titulo: 'Bem-vindo ao Agência OS', texto: `${ctx.real.nome} criou seu acesso como ${perms.rotuloPapel(criado.u.papel)}. Troque a senha temporária no primeiro acesso.`, link: '#/notificacoes' });
+  ctx.notify.enviar({ para: [criado.u.id], tipo: 'sistema', titulo: 'Bem-vindo ao Gmarketing', texto: `${ctx.real.nome} criou seu acesso como ${perms.rotuloPapel(criado.u.papel)}. Troque a senha temporária no primeiro acesso.`, link: '#/notificacoes' });
   await modalSenha(ctx, criado.u, criado.senha, 'Acesso criado');
   ctx.refresh();
   ui.toast(`${criado.u.nome} já pode entrar com ${criado.u.email}.`, { desfazer: () => db.batch(() => { db.remove('users', criado.u.id, { log: `desfez o convite de ${criado.u.nome}` }); if (criado.u.teamId) db.update('team', criado.u.teamId, { userId: null }); }) });

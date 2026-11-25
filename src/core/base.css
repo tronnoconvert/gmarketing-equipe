@@ -1,5 +1,5 @@
 /* ===================================================================
-   Agência OS — base.css (tokens, shell, componentes, gráficos, login)
+   Gmarketing — base.css (tokens, shell, componentes, gráficos, login)
    Tema claro padrão; html[data-tema="escuro"] = azul-marinho.
    Módulos: prefixar classes com .m-<id> no style.css do módulo e usar os tokens abaixo.
    =================================================================== */
@@ -882,3 +882,4 @@ html.sb-fechado .sb-tg .ic{transform:rotate(180deg)}
 @media (min-width:1001px){html.sb-fechado .sb{display:none}html.sb-fechado .app{grid-template-columns:minmax(0,1fr)}}
 @media (max-width:1000px){.sb-tg{display:none}}
 @media print{.sb-tg{display:none}}
+.brand-g{color:#fff;font-weight:800;font-size:16px;letter-spacing:-.02em;line-height:1;font-family:inherit}

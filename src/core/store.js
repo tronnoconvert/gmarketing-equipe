@@ -49,7 +49,7 @@ const LocalAdapter = {
     clearTimeout(this._t); this._t = null;
     if (!this.storageOk) return;
     try { localStorage.setItem(KEY, JSON.stringify({ v: DB_VERSION, dv: CFG.dataVersion || null, meta, cols: mem })); }
-    catch (e) { this.storageOk = false; console.warn('[Agência OS] armazenamento local indisponível; usando memória.', e && e.message); }
+    catch (e) { this.storageOk = false; console.warn('[Gmarketing] armazenamento local indisponível; usando memória.', e && e.message); }
   },
   write() { this.save(); },
   clear() { try { localStorage.removeItem(KEY); } catch (e) { /* memória */ } },
@@ -79,7 +79,7 @@ const SupabaseAdapter = {
     const q = op === 'remove'
       ? this.client.from('records').delete().eq('id', id)
       : this.client.from('records').upsert({ id, col, data: obj, org_id: this.orgId, updated_at: nowIso() });
-    q.then(({ error }) => { if (error) { console.warn('[Agência OS] falha ao salvar no Supabase:', error.message); emit(col, 'erro', { id: obj.id, erro: error.message }); } });
+    q.then(({ error }) => { if (error) { console.warn('[Gmarketing] falha ao salvar no Supabase:', error.message); emit(col, 'erro', { id: obj.id, erro: error.message }); } });
   },
   realtime() {
     if (!this.client || CFG.realtime === false) return;
@@ -91,7 +91,7 @@ const SupabaseAdapter = {
         if (p.eventType === 'DELETE') { if (i >= 0) a.splice(i, 1); emit(row.col, 'remove', { id: rid }, true); }
         else { if (i >= 0) a[i] = p.new.data; else a.push(p.new.data); emit(row.col, i >= 0 ? 'update' : 'insert', p.new.data, true); }
       }).subscribe();
-    } catch (e) { console.warn('[Agência OS] realtime indisponível', e && e.message); }
+    } catch (e) { console.warn('[Gmarketing] realtime indisponível', e && e.message); }
   },
   flush() {}, clear() {},
 };
@@ -239,7 +239,7 @@ if (SUPA) {
       await SupabaseAdapter.init();
       mem = await SupabaseAdapter.load();
     } catch (e) {
-      console.warn('[Agência OS] não foi possível carregar do Supabase:', e && e.message);
+      console.warn('[Gmarketing] não foi possível carregar do Supabase:', e && e.message);
       db.loadError = (e && e.message) || 'erro desconhecido';
     }
     COLS.forEach(arr); loaded = true;

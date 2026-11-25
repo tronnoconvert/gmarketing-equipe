@@ -88,7 +88,7 @@ export const auth = {
       if (!su) { sess = null; gravarSessao(null); return; }
       const u = db.find('users', x => x.authId === su.id || String(x.email).toLowerCase() === String(su.email).toLowerCase());
       if (u && (!sess || sess.userId !== u.id)) { sess = { userId: u.id, verComo: null }; gravarSessao(sess); }
-    } catch (e) { console.warn('[Agência OS] sessão indisponível', e && e.message); }
+    } catch (e) { console.warn('[Gmarketing] sessão indisponível', e && e.message); }
   },
 
   /** tela de login; chama onOk() após entrar */
@@ -103,7 +103,7 @@ export const auth = {
     root.innerHTML = `
 <div class="lg lgn">
   <section class="lg-side" aria-hidden="true">
-    <div class="lg-brand"><span class="brand-mk">${svgIc('radar')}</span><b>Agência OS</b></div>
+    <div class="lg-brand"><span class="brand-mk brand-g" aria-hidden="true">G</span><b>Gmarketing</b></div>
     <div class="lg-pitch">
       <h2>O painel de controle da sua agência.</h2>
       <p>Receita, clientes, operação, equipe e tráfego em um só lugar — com luzes que mostram o que precisa de você hoje.</p>
@@ -117,7 +117,7 @@ export const auth = {
   </section>
   <main class="lg-main">
     <div class="lg-card">
-      <div class="lg-brand lg-brand-m"><span class="brand-mk">${svgIc('radar')}</span><b>Agência OS</b></div>
+      <div class="lg-brand lg-brand-m"><span class="brand-mk brand-g" aria-hidden="true">G</span><b>Gmarketing</b></div>
       <h1>Entrar</h1>
       <p class="lg-sub">Use seu e-mail de trabalho e senha.</p>
       <form class="lg-form" novalidate>

@@ -137,7 +137,7 @@ function layoutHtml() {
   return `<a class="skip" href="#view" data-skip>Pular para o conteúdo</a>
 <div class="app">
 <aside class="sb" id="sb" aria-label="Menu principal">
-  <div class="sb-top"><a class="brand" id="brand" href="#/${esc(rotaHome())}" aria-label="Agência OS — ir para o início"><span class="brand-mk">${svgIc('radar')}</span><b>Agência OS</b></a>${ui.btnIc('x', 'Fechar menu', { 'data-sb-fechar': '' }, { cls: 'sb-x' })}</div>
+  <div class="sb-top"><a class="brand" id="brand" href="#/${esc(rotaHome())}" aria-label="Gmarketing — ir para o início"><span class="brand-mk brand-g" aria-hidden="true">G</span><b>Gmarketing</b></a>${ui.btnIc('x', 'Fechar menu', { 'data-sb-fechar': '' }, { cls: 'sb-x' })}</div>
   <nav class="nv" id="nv" aria-label="Seções">${menuHtml()}</nav>
   <div class="sb-foot" id="sb-me">${cartaoUsuario()}</div>
 </aside>
@@ -208,10 +208,10 @@ function atualizarCrumb(mod) {
   const partes = [];
   if (g) partes.push(`<span class="cr-g">${esc(g)}</span>`);
   if (mod) partes.push(migalhaExtra ? `<a href="#/${esc(rotaInicial(mod))}">${esc(titulo(mod))}</a>` : `<b>${esc(titulo(mod))}</b>`);
-  else partes.push(`<b>${esc(migalhaExtra || 'Agência OS')}</b>`);
+  else partes.push(`<b>${esc(migalhaExtra || 'Gmarketing')}</b>`);
   if (mod && migalhaExtra) partes.push(`<b>${esc(migalhaExtra)}</b>`);
   c.innerHTML = partes.join(`<span class="cr-s" aria-hidden="true">${svgIc('chev')}</span>`);
-  document.title = `${migalhaExtra ? migalhaExtra + ' · ' : ''}${mod ? titulo(mod) + ' · ' : ''}Agência OS`;
+  document.title = `${migalhaExtra ? migalhaExtra + ' · ' : ''}${mod ? titulo(mod) + ' · ' : ''}Gmarketing`;
 }
 
 /* ---------------- render das rotas ---------------- */
@@ -261,14 +261,14 @@ async function renderRota(r, manterScroll = false) {
         else html = out;
         mountFn = mod.mount;
       } catch (e) {
-        console.error(`[Agência OS] erro ao renderizar ${mod.id}:`, e);
+        console.error(`[Gmarketing] erro ao renderizar ${mod.id}:`, e);
         html = paginaErro('alert', 'Algo deu errado nesta tela', 'Recarregue a página. Se continuar, avise o administrador com o horário do erro.', { rotulo: 'Recarregar', attrs: { onclick: 'location.reload()' } });
       }
     }
   }
   view.innerHTML = html || '';
   view.dataset.rota = r.pattern || r.path;
-  if (mountFn) { try { const c = mountFn(view, ctx); if (typeof c === 'function') cleanup = c; } catch (e) { console.error(`[Agência OS] erro no mount de ${mod ? mod.id : r.path}:`, e); } }
+  if (mountFn) { try { const c = mountFn(view, ctx); if (typeof c === 'function') cleanup = c; } catch (e) { console.error(`[Gmarketing] erro no mount de ${mod ? mod.id : r.path}:`, e); } }
   atualizarChrome(); atualizarCrumb(mod);
   posRender(view);
   if (mudouPath) { window.scrollTo(0, 0); if (document.activeElement === document.body || !document.activeElement || !root.contains(document.activeElement) || document.activeElement.closest('.nv')) view.focus({ preventScroll: true }); }
@@ -593,7 +593,7 @@ export function setDensidade(d, o = {}) {
 function alternarDensidade() { const d = densidade() === 'compacta' ? 'confortavel' : 'compacta'; setDensidade(d); toast(d === 'compacta' ? 'Tabelas compactas: mais linhas na tela.' : 'Densidade confortável restaurada.', { tipo: 'info', desfazer: () => setDensidade(d === 'compacta' ? 'confortavel' : 'compacta') }); }
 function aplicarDensidadeDoUsuario() { setDensidade(LS.get(`aos-densidade:${uidLS()}`, 'confortavel'), { salvar: false, render: false }); }
 const ehMacK = () => teclaPaleta().replace('⌘K', '⌘ K');
-async function sair() { const ok = await ui.confirmar('Você vai precisar entrar de novo para acessar o painel.', { titulo: 'Sair do Agência OS?', confirmar: 'Sair', perigo: false }); if (ok) auth.logout(); }
+async function sair() { const ok = await ui.confirmar('Você vai precisar entrar de novo para acessar o painel.', { titulo: 'Sair do Gmarketing?', confirmar: 'Sair', perigo: false }); if (ok) auth.logout(); }
 export function setPeriodo(id) {
   if (!PERIODOS.some(p => p.id === id)) return;
   periodoAtual = id; LS.set('aos-periodo', id);
@@ -613,7 +613,7 @@ function montarApp() {
 }
 function telaLogin() {
   montado = false; entrando = true; fecharPaleta('sem-foco'); if (cleanup) { try { cleanup(); } catch (e) { /* */ } cleanup = null; }
-  document.title = 'Entrar · Agência OS';
+  document.title = 'Entrar · Gmarketing';
   auth.renderLogin(root, () => {});
   reportarTeste({ path: 'login', query: {} });
 }

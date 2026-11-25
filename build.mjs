@@ -48,7 +48,7 @@ const single = html
   .replace(/<!--AOS:CONFIG-->[\s\S]*?<!--\/AOS:CONFIG-->/, '<script>window.AOS_SINGLE = true;</script>')
   .replace(/<!--AOS:CSS-->[\s\S]*?<!--\/AOS:CSS-->/, () => `<style>\n${cssInline}\n</style>`)
   .replace(/<!--AOS:JS-->[\s\S]*?<!--\/AOS:JS-->/, () => `<script>\n${js}\n</script>`);
-fs.writeFileSync(path.join(DIST, 'agencia-os.html'), single.replace('<title>Agência OS</title>', '<title>Protótipo Oficial</title>'));
+fs.writeFileSync(path.join(DIST, 'agencia-os.html'), single.replace('<title>Gmarketing</title>', '<title>Protótipo Oficial</title>'));
 
 const kb = f => (fs.statSync(path.join(DIST, f)).size / 1024).toFixed(0) + ' KB';
 console.log(`build ok em ${Date.now() - t0} ms · app.js ${kb('app.js')} · app.css ${kb('app.css')} (${cssMods.length} css de módulos) · agencia-os.html ${kb('agencia-os.html')}`);

@@ -30,7 +30,7 @@ export function enviar(o = {}) {
   const ext = (o.canais || []).filter(c => c !== 'app');
   if (ext.length && criadas.length) {
     if (db.mode === 'supabase' && db.supabase && db.supabase.functions) {
-      db.supabase.functions.invoke('notify', { body: { ids: criadas.map(c => c.id), canais: ext } }).catch(e => console.warn('[Agência OS] notify', e && e.message));
+      db.supabase.functions.invoke('notify', { body: { ids: criadas.map(c => c.id), canais: ext } }).catch(e => console.warn('[Gmarketing] notify', e && e.message));
     } else if (o.silencioso !== true) {
       ext.forEach(c => toast(`Enviado ${CANAIS[c]} (simulado no modo demonstração).`, { tipo: 'info' }));
     }

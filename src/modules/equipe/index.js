@@ -217,7 +217,7 @@ export default {
 async function alternarAtivo(teamId) {
   const p = pessoa(teamId); const u = db.get('users', p.userId); if (!u) return;
   const ativar = u.ativo === false;
-  const ok = await ui.confirmar(ativar ? `${p.nome} voltará a entrar no Agência OS com o papel ${perms.rotuloPapel(u.papel)}.` : `${p.nome} não conseguirá mais entrar. Tarefas e histórico são mantidos.`, { titulo: ativar ? 'Reativar acesso?' : 'Desativar acesso?', confirmar: ativar ? 'Reativar' : 'Desativar', perigo: !ativar });
+  const ok = await ui.confirmar(ativar ? `${p.nome} voltará a entrar no Gmarketing com o papel ${perms.rotuloPapel(u.papel)}.` : `${p.nome} não conseguirá mais entrar. Tarefas e histórico são mantidos.`, { titulo: ativar ? 'Reativar acesso?' : 'Desativar acesso?', confirmar: ativar ? 'Reativar' : 'Desativar', perigo: !ativar });
   if (!ok) return;
   db.update('users', u.id, { ativo: ativar }, { log: `${ativar ? 'reativou' : 'desativou'} o acesso de ${p.nome}` });
   ui.toast(ativar ? 'Acesso reativado.' : 'Acesso desativado.', { desfazer: () => db.update('users', u.id, { ativo: !ativar }) });

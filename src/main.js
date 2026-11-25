@@ -1,4 +1,4 @@
-// main.js — boot do Agência OS: semente do core, registro dos módulos e início do shell.
+// main.js — boot do Gmarketing: semente do core, registro dos módulos e início do shell.
 import './core/seed-core.js';
 import { db } from './core/store.js';
 import { auth } from './core/auth.js';
