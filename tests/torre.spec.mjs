@@ -231,16 +231,24 @@ export default async function (t) {
   ok(await page.$eval('[data-rodar="r-health"]', b => b.disabled), 'Rodar agora desabilitado');
   ok(await page.$eval('[data-nova-rotina]', b => b.disabled), 'Nova rotina desabilitada');
 
-  step('Painel de Voo da Ana (gestora): só os clientes dela, sem receita');
+  step('Painel de Voo da Ana (gestora): abre em "Meus clientes", vê todas as contas vinculadas, sem receita');
   await t.ir('#/torre/voo'); await page.waitForSelector('.m-voo-contas tbody tr', { timeout: 6000 });
   const esperadas = await voo(() => { const db = window.AOS.db; const ids = new Set(db.list('clients', c => c.respId === 't-ana' || (c.equipe || []).includes('t-ana')).flatMap(c => c.metaContas || [])); return ids.size; });
-  ok((await page.$$('.m-voo-contas tbody tr')).length === esperadas && esperadas > 0 && esperadas < 17, `vê só as contas dos clientes dela (${esperadas})`);
+  ok((await page.$$('.m-voo-contas tbody tr')).length === esperadas && esperadas > 0 && esperadas < 17, `abre em "Meus clientes": só as contas dos clientes dela (${esperadas})`);
+  ok(await page.$eval('.m-voo-chips [aria-current="true"]', a => /Meus clientes/.test(a.textContent)), 'filtro padrão "Meus clientes" marcado');
+  const vinculadas = await voo(() => new Set(window.AOS.db.list('clients').flatMap(c => c.metaContas || [])).size);
+  await t.ir('#/torre/voo?f=todas'); await page.waitForTimeout(300);
+  ok((await page.$$('.m-voo-contas tbody tr')).length === vinculadas && vinculadas > esperadas, `"Todas": as ${vinculadas} contas vinculadas a clientes (cobre colega)`);
+  ok(await voo(() => window.AOS_VOO.estado.geral.contas.every(c => c.clientId)), 'nenhuma conta sem cliente para a gestora');
+  const alheia = await voo(() => { const c = window.AOS.db.list('clients', c => (c.metaContas || []).length && c.respId !== 't-ana' && !(c.equipe || []).includes('t-ana'))[0]; return String(c.metaContas[0]).replace(/\D/g, ''); });
+  await abrirConta(alheia, 'campanhas');
+  ok(!/não está no seu Painel de Voo/.test(await page.textContent('#view')) && !!(await page.$('[data-voo-pausar],[data-voo-orc]')), 'gestora abre e pode agir na conta de cliente de outro responsável');
   ok(!(await page.$('.m-voo-vincs')), 'sem "Contas sem cliente vinculado" para gestor');
   ok(await voo(() => window.AOS_VOO.estado.geral.linhas.every(l => l[10] == null) && window.AOS_VOO.estado.geral.veReceita === false), 'pacote sem valores de receita (faturamento)');
   await abrirConta('9000000000000107');
   ok(!/Faturamento/.test(await page.textContent('#view')), 'gestora não vê faturamento/ROAS');
   await t.ir('#/torre/voo/9000000000000192'); await page.waitForTimeout(1200);
-  ok(/não está no seu Painel de Voo/.test(await page.textContent('#view')), 'conta de outro cliente não abre para a gestora');
+  ok(/não está no seu Painel de Voo/.test(await page.textContent('#view')), 'conta sem cliente vinculado não abre para a gestora');
   const dia = await page.evaluate(() => new Date().getDay());
   await t.ir('#/torre/voo'); await page.waitForTimeout(400);
   if (dia === 1) ok(!(await page.$('[data-voo-rel]')), 'segunda-feira: sem faixa');

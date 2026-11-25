@@ -370,13 +370,17 @@ export default async function (t) {
   await t.ir('#/clientes/c-orion/resultados-acoes'); await shot('ficha-resultados-escuro');
   await page.evaluate(() => AOS.shell.setTema('claro'));
 
-  step('permissões: gestora de tráfego vê só os seus');
+  step('permissões: gestora de tráfego abre em "Meus clientes" e alterna para todos');
   await t.sair();
   await t.login('ana@agencia.demo');
   await t.ir('#/clientes');
   const nAna = await page.$$eval('.m-clientes-cart tbody tr', e => e.length);
-  const esperado = await db(() => AOS.perms.escopoClientes().length);
-  ok(nAna === esperado && nAna < 42, `Ana vê ${nAna} clientes (escopo ${esperado})`);
+  const esperado = await db(() => AOS.perms.meusClientes().filter(id => (AOS.db.get('clients', id) || {}).ativo !== false).length);
+  ok(nAna === esperado && nAna < 42 && await db(() => AOS.perms.escopoClientes() === 'todos'), `Ana abre em "Meus clientes": ${nAna} (dela ${esperado})`);
+  await t.ir('#/clientes?f=todos');
+  const nTodos = await page.$$eval('.m-clientes-cart tbody tr', e => e.length);
+  ok(nTodos > nAna, `"Todos" mostra a carteira inteira para cobrir colega (${nTodos})`);
+  ok(!(await txt('.m-clientes-kpis')).includes('MRR'), 'sem MRR para a gestora');
   await t.ir('#/clientes/c-orion/cadastro');
   ok(!(await txt('.view')).includes('Comissão variável') && (await txt('.view')).replace(/\s+/g, ' ').includes('R$ 45.000/mês'), 'Ana vê o teto de mídia, mas não a comissão variável');
   await t.ir('#/clientes/c-orion/cadastro?editar=1');
@@ -387,7 +391,7 @@ export default async function (t) {
   ok(!(await page.$('[data-add-cm]')), 'cadastro em etapas sem comissão para quem não vê receita');
   await page.click('[data-descartar]'); await page.waitForTimeout(200);
   await t.ir('#/clientes/c-vida');
-  ok((await txt('.view')).includes('Este cliente não está na sua carteira') || esperado && (await db(() => AOS.perms.podeCliente('c-vida'))), 'cliente fora do escopo bloqueado');
+  ok(!(await txt('.view')).includes('Este cliente não está na sua carteira') && await db(() => AOS.perms.podeCliente('c-vida')), 'cliente de outro responsável abre para a gestora');
 
   step('permissões: produção só vê, sem editar');
   await t.sair();
