@@ -1,9 +1,9 @@
-// Torre de Controle › Rotinas e integrações (docs/spec-dono.md §4) + Painel de Voo (iframe, preservado do placeholder).
+// Torre de Controle › Rotinas e integrações (docs/spec-dono.md §4) + Painel de Voo nativo (voo.js, item 17).
 import './data.js';
 import { db } from '../../core/store.js';
 import * as fmtc from '../../core/fmt.js';
 import { perms } from '../../core/perms.js';
-import { renderVoo, mountVoo } from './voo.js';
+import { renderVoo, mountVoo, buscaVoo } from './voo.js';
 import { ROT_ESTADO, rodando, onRodando, rodar, pausar, retomar, reconectar, testar, falhasTorre } from './engine.js';
 
 // rotinas de dinheiro que entra (MRR, conciliação de recebimentos, cobrança): só quem vê receita
@@ -257,11 +257,11 @@ export default {
   icone: 'radio-tower',
   grupo: 'trafego',
   rota: 'torre',
-  routes: ['torre', 'torre/voo', 'torre/rotina/:id'],
-  watch: ['routines', 'routineRuns', 'integrations', 'team', 'relatorios', 'clients'],
+  routes: ['torre', 'torre/voo', 'torre/voo/:conta', 'torre/rotina/:id'],
+  watch: ['routines', 'routineRuns', 'integrations', 'team', 'relatorios', 'clients', 'clientActions', 'recsLog', 'alerts', 'settings'],
   sub: [
     { id: 'rotinas', titulo: 'Rotinas e integrações', rota: 'torre', perm: 'torre' },
-    { id: 'voo', titulo: 'Painel de Voo', rota: 'torre/voo', perm: 'torre_voo' },
+    { id: 'voo', titulo: 'Painel de Voo', rota: 'torre/voo', perm: 'torre_voo', prefixo: true },
   ],
   contador() {
     const f = falhasTorre();
@@ -271,17 +271,15 @@ export default {
     const N = s => fmtc.norm(s || '');
     const r = db.list('routines', x => rotVisivel(x) && (N(x.nome).includes(q) || N(x.desc).includes(q))).map(x => ({ tipo: 'Rotinas', titulo: x.nome, sub: `${ROT_ESTADO[x.estado]} · ${x.freq}`, href: `#/torre/rotina/${x.id}`, led: x.estado, icone: 'radio-tower' }));
     const i = db.list('integrations', x => N(x.nome).includes(q) || N('integracao').includes(q)).map(x => ({ tipo: 'Integrações', titulo: x.nome, sub: x.status, href: '#/torre', led: x.estado, icone: 'link' }));
-    return [...r, ...i];
+    return [...r, ...i, ...buscaVoo(q)];
   },
   render(ctx) {
-    if (ctx.path === 'torre/voo') {
-      return renderVoo(ctx);
-    }
+    if (ctx.path === 'torre/voo' || ctx.path.startsWith('torre/voo/')) return renderVoo(ctx);
     if (ctx.params && ctx.params.id && ctx.path.startsWith('torre/rotina/')) return paginaLog(ctx);
     return paginaRotinas(ctx);
   },
   mount(el, ctx) {
-    if (ctx.path === 'torre/voo') return mountVoo(el, ctx);
+    if (ctx.path === 'torre/voo' || ctx.path.startsWith('torre/voo/')) return mountVoo(el, ctx);
     const onClick = e => {
       const b = e.target.closest('[data-rodar],[data-pausar],[data-retomar],[data-reconectar],[data-testar],[data-nova-rotina]');
       if (!b || b.disabled) return;

@@ -214,6 +214,12 @@ const COMISSOES = {
 };
 
 /* ---------- montagem dos clientes ---------- */
+/* Painel de Voo (item 17): contas de anúncios FICTÍCIAS ligadas aos clientes (mesmos ids de src/modules/torre/voo-demo.js)
+   + meta de custo por conversa (R$) usada no semáforo */
+const META_DEMO = { 'c-orion': ['9000000000000101', 14], 'c-vida': ['9000000000000102', 18], 'c-alfa': ['9000000000000103', 22], 'c-imob': ['9000000000000104', 16],
+  'c-bella': ['9000000000000105', 9], 'c-autocenter': ['9000000000000106', 12], 'c-nutrivitta': ['9000000000000107', 30], 'c-sorriso': ['9000000000000108', 15],
+  'c-lumen': ['9000000000000109', 25], 'c-dermacare': ['9000000000000110', 17], 'c-mundokids': ['9000000000000111', 10], 'c-pontoforte': ['9000000000000112', 11],
+  'c-marazul': ['9000000000000113', 20], 'c-equilibrio': ['9000000000000114', 13] };
 function montar(base) {
   const r = rng('cli' + base.id);
   const c = { ...base };
@@ -227,6 +233,8 @@ function montar(base) {
   c.componentes = componentesDe(c, r);
   c.delta30 = c.id === 'c-orion' ? -22 : c.tendencia[5] - c.tendencia[4];
   c.tetoMidiaMensal = tetoDe(c);
+  c.metaContas = META_DEMO[c.id] ? [META_DEMO[c.id][0]] : [];
+  c.metaCustoConversa = META_DEMO[c.id] ? META_DEMO[c.id][1] : null;
   c.comissoes = (COMISSOES[c.id] || []).map(x => ({ ...x }));
   return c;
 }

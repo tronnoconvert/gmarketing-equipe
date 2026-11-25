@@ -1,4 +1,4 @@
-// tests/seguranca.spec.mjs — Guardião de segurança ponta a ponta: invasão simulada na Torre (iframe) → alerta SUPREMO no app,
+// tests/seguranca.spec.mjs — Guardião de segurança ponta a ponta: invasão simulada no Painel de Voo nativo → alerta SUPREMO no app,
 // banner em tela cheia + sirene para gestor de tráfego, dono e admin (não para produção), banner fica até alguém assumir,
 // "Assumir incidente" para a sirene de todos, reincidência reabre, liberação com SIM + checklist reativa na Torre.
 import path from 'node:path';
@@ -17,20 +17,19 @@ export default async function (t) {
   };
   const sir = () => page.evaluate(() => window.AOS_SIRENE.estado());
   const banner = () => page.$('#aos-inv');
-  const torre = async () => {
-    await page.waitForFunction(() => { const f = document.querySelector('.m-torre-voo-host iframe'); try { return f.contentWindow.Guardiao && f.contentDocument.querySelector('#board'); } catch (e) { return false; } }, null, { timeout: 10000 });
-    return page.frames().find(f => /torre-controle/.test(f.url()));
-  };
+  const CONTA = '9000000000000102'; // conta fictícia "Clínica Vida" (modo demonstração)
+  const abrir = async () => { await t.ir(`#/torre/voo/${CONTA}?aba=campanhas`); await page.waitForSelector(`[data-voo-conta="${CONTA}"]`, { timeout: 8000 }); await page.waitForTimeout(200); };
+  const camps = () => page.evaluate(id => window.AOS_VOO.statusCampanhas(id), CONTA);
 
   step('dono simula invasão na Torre');
   await t.login();
   ok(await page.evaluate(() => !!window.AOS_INVASAO && !!window.AOS_SIRENE), 'módulos de invasão e sirene carregados');
   ok(!(await banner()), 'sem incidente, sem banner');
-  await t.ir('#/torre/voo');
-  let fr = await torre();
-  await page.waitForTimeout(300);
-  ok(await fr.evaluate(() => !!document.querySelector('[data-gt="simular"]')), 'Torre mostra "Simular invasão" para o dono (papel enviado pelo app)');
-  const contaId = await fr.evaluate(() => { const b = document.querySelector('[data-gt="simular"]'); const id = +b.dataset.a; b.click(); return id; });
+  await page.evaluate(() => { window.AOS_VOO.demoReset(); window.AOS_VOO_ATRASO = 0; });
+  await abrir();
+  ok(!!(await page.$('[data-gt="simular"]')), 'Painel de Voo mostra "Simular invasão" para o dono (demonstração)');
+  const contaId = CONTA;
+  await page.click('[data-gt="simular"]');
   await page.waitForSelector('#aos-inv', { timeout: 4000 });
   await page.waitForTimeout(200);
   const txt = await page.textContent('#aos-inv');
@@ -45,7 +44,11 @@ export default async function (t) {
   ok(reg.a && reg.a.area === 'Segurança' && reg.a.sev === 'err' && reg.a.inc === 'aberto' && reg.a.pausados >= 2, `alerta de segurança gravado (${JSON.stringify(reg.a)})`);
   ok(reg.n.includes('u-ana') && reg.n.includes('u-gabriel') && reg.n.includes('u-rayane') && !reg.n.includes('u-carla') && !reg.n.includes('u-bruno'), `notificação crítica para gestores + dono + admin, não para produção/CS (${reg.n})`);
   ok(reg.run === 1, 'execução registrada na rotina Guardião de segurança');
-  ok(await fr.evaluate(id => gtQ(conta(id)) && conta(id).camps.every(c => c.status === 'Pausada'), contaId), 'conta da Torre pausada e em quarentena');
+  await page.waitForTimeout(400);
+  const cs0 = await camps();
+  ok(cs0.length >= 2 && cs0.every(c => c.st !== 'ACTIVE') && cs0.some(c => /NOVA/.test(c.n)), `conta pausada inteira, inclusive a campanha do invasor (${cs0.map(c => c.st).join(',')})`);
+  await abrir();
+  ok(await page.isVisible('.m-voo-qb'), 'faixa de quarentena no Painel de Voo');
   await shot('banner');
 
   step('banner fica até alguém assumir');
@@ -78,13 +81,12 @@ export default async function (t) {
   await shot('faixa');
 
   step('reincidência reabre o alerta');
-  await t.ir('#/torre/voo'); fr = await torre(); await page.waitForTimeout(400);
-  ok(await fr.evaluate(id => gtQ(conta(id)), contaId), 'Torre continua em quarentena');
-  await fr.evaluate(id => { S.open = id; render(); }, contaId); await page.waitForTimeout(150);
-  await fr.evaluate(() => document.querySelector('[data-gt="reativar"]').click());
-  await page.waitForSelector('#aos-inv', { timeout: 7000 });
+  await abrir();
+  ok(await page.isVisible('.m-voo-qb'), 'conta continua em quarentena');
+  await page.click('[data-gt="reativar"]');
+  await page.waitForSelector('#aos-inv', { timeout: 9000 });
   ok(/REINCIDÊNCIA/.test(await page.textContent('#aos-inv')) && (await sir()).tocando, 'reativação pelo invasor → pausa de novo, banner "REINCIDÊNCIA" e sirene (mesmo quem silenciou antes)');
-  ok(await fr.evaluate(id => conta(id).camps.every(c => c.status === 'Pausada'), contaId), 'Torre pausou de novo');
+  ok((await camps()).every(c => c.st !== 'ACTIVE'), 'Guardião pausou de novo');
   await page.click('[data-inv-assumir]'); await page.waitForTimeout(250);
 
   step('Alertas: incidente, regra e liberação com SIM + checklist');
@@ -98,7 +100,6 @@ export default async function (t) {
   ok(await page.isVisible('.mb-err') && /Corrija/.test(await page.textContent('.mb-err')), 'limite inválido é recusado com mensagem');
   await page.fill('[name="gasto-pico:fator"]', '6'); await page.click('.mbox [data-ok]'); await page.waitForTimeout(250);
   ok(await page.evaluate(() => (window.AOS.db.config('guardiaoRegras', {})['gasto-pico'] || {}).params.fator === 6), 'limites gravados em settings guardiaoRegras');
-  ok(await fr.evaluate(() => GT.regras['gasto-pico'] && GT.regras['gasto-pico'].params.fator === 6), 'Torre recebeu os limites novos');
   const incId = await page.evaluate(() => window.AOS.db.list('alerts', x => x.tipo === 'invasao')[0].id);
   await t.ir(`#/alertas?incidente=${incId}`); await page.waitForSelector('.inv-dr', { timeout: 3000 });
   ok(/Antes do incidente/.test(await page.textContent('.inv-dr')), 'gaveta do incidente com orçamento antes → no incidente');
@@ -115,8 +116,9 @@ export default async function (t) {
   const fim = await page.evaluate(id => { const a = window.AOS.db.get('alerts', id); return { est: a.incidente.estado, res: a.resolvido, reat: (a.incidente.reativadas || []).length }; }, incId);
   ok(fim.est === 'encerrado' && fim.res && fim.reat >= 1, `incidente encerrado com campanhas reativadas (${JSON.stringify(fim)})`);
   ok(!(await page.$('#aos-inv-fx')), 'faixa de quarentena some');
-  const tr = await fr.evaluate(id => ({ q: gtQ(conta(id)), ativas: conta(id).camps.filter(c => c.status !== 'Pausada').map(c => c.nome) }), contaId);
-  ok(!tr.q && tr.ativas.length >= 1 && !tr.ativas.some(n => /NOVA/.test(n)), `Torre liberada: reativou só as campanhas da conta, não a do invasor (${tr.ativas.length})`);
+  await abrir();
+  const ativas = (await camps()).filter(c => c.st === 'ACTIVE').map(c => c.n);
+  ok(ativas.length >= 1 && !ativas.some(n => /NOVA/.test(n)), `conta liberada: reativou só as campanhas da conta, não a do invasor (${ativas.length})`);
 
   step('gestor de tráfego não libera');
   await entrar('ana@agencia.demo');
