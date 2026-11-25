@@ -10,6 +10,9 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import http from 'node:http';
+import { createRequire } from 'node:module';
+import { spawnSync } from 'node:child_process';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const cfg = fs.readFileSync(path.join(ROOT, 'public/config.js'), 'utf8');
@@ -30,7 +33,10 @@ function criarUsuario(u) {
        values ('00000000-0000-0000-0000-000000000000', '${id}', 'authenticated', 'authenticated', '${email}', crypt('${esc(SENHA)}', gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{}', now(), now(), '', '', '', '');
        insert into auth.identities (id, user_id, provider_id, identity_data, provider, created_at, updated_at, last_sign_in_at)
        values (gen_random_uuid(), '${id}', '${id}', jsonb_build_object('sub', '${id}', 'email', '${email}'), 'email', now(), now(), now());
-       insert into public.profiles (user_id, org_id, papel, team_id, app_user_id, ativo) values ('${id}', 'gmarketing', '${u.papel}', '${u.team}', 'u-voo-${u.chave}', true);`);
+       insert into public.profiles (user_id, org_id, papel, team_id, app_user_id, ativo) values ('${id}', 'gmarketing', '${u.papel}', '${u.team}', 'u-voo-${u.chave}', true);
+       insert into public.records (id, col, data, org_id) values
+         ('users:u-voo-${u.chave}', 'users', '${esc(JSON.stringify({ id: `u-voo-${u.chave}`, nome: `Teste Voo ${u.chave}`, email, papel: u.papel, teamId: u.team, authId: id, ativo: true }))}'::jsonb, 'gmarketing'),
+         ('team:${u.team}', 'team', '${esc(JSON.stringify({ id: u.team, nome: `Teste Voo ${u.chave}`, papel: u.papel, userId: `u-voo-${u.chave}`, ativo: true, area: 'Tráfego' }))}'::jsonb, 'gmarketing');`);
   return { ...u, id, email };
 }
 async function entrar(u) {
@@ -41,9 +47,40 @@ async function fn(nome, token, body) {
   const r = await fetch(`${URL_SB}/functions/v1/${nome}`, { method: 'POST', headers: { apikey: ANON, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   let j = null; try { j = await r.json(); } catch { /* */ } return { status: r.status, j };
 }
+/** tela de produção (build com public/config.js) com o gestor de teste: lista, detalhe ao vivo, sem receita, ações desligadas */
+async function telaProducao(u, conta) {
+  console.log('▶ tela (build de produção)');
+  const require = createRequire(import.meta.url);
+  let pw; try { pw = require('playwright'); } catch { pw = require(path.join(spawnSync('npm', ['root', '-g'], { encoding: 'utf8' }).stdout.trim(), 'playwright')); }
+  const DIST = path.resolve(process.env.OUT);
+  const srv = http.createServer((q, r) => { let p = decodeURIComponent(new URL(q.url, 'http://x').pathname); if (p.endsWith('/')) p += 'index.html'; const f = path.join(DIST, path.normalize(p)); if (!f.startsWith(DIST) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { r.writeHead(404); return r.end(); } r.writeHead(200, { 'content-type': { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css' }[path.extname(f)] || 'application/octet-stream' }); fs.createReadStream(f).pipe(r); });
+  await new Promise(r => srv.listen(0, '127.0.0.1', r));
+  const browser = await pw.chromium.launch({ proxy: process.env.HTTPS_PROXY ? { server: process.env.HTTPS_PROXY, bypass: '127.0.0.1,localhost' } : undefined });
+  try {
+    const ctx = await browser.newContext({ viewport: { width: 1366, height: 900 }, locale: 'pt-BR', timezoneId: 'America/Sao_Paulo' });
+    await ctx.route(/cdn\.jsdelivr\.net\/npm\/@supabase\/supabase-js/, r => r.fulfill({ status: 200, contentType: 'text/javascript; charset=utf-8', body: fs.readFileSync(process.env.SUPABASE_ESM_FILE, 'utf8') }));
+    await ctx.route(/fonts\.(googleapis|gstatic)\.com/, r => r.fulfill({ status: 200, contentType: 'text/css', body: '' }));
+    const page = await ctx.newPage(); const erros = [];
+    page.on('pageerror', e => erros.push(e.message)); page.on('console', m => { if (m.type() === 'error' && !/favicon|Failed to load resource/.test(m.text())) erros.push(m.text()); });
+    const raiz = `http://127.0.0.1:${srv.address().port}/index.html`;
+    await page.goto(raiz); await page.waitForSelector('#lg-email', { timeout: 30000 });
+    await page.fill('#lg-email', u.email); await page.fill('#lg-senha', SENHA); await page.click('.lg-go'); await page.waitForSelector('#view', { timeout: 30000 });
+    await page.goto(`${raiz}#/torre/voo`); await page.waitForSelector('.m-voo-contas tbody tr', { timeout: 60000 });
+    ok((await page.$$('.m-voo-contas tbody tr')).length === 1, 'tela: gestor vê 1 conta (a do cliente dele)');
+    await page.goto(`${raiz}#/torre/voo/${conta}`); await page.waitForSelector(`[data-voo-conta="${conta}"]`, { timeout: 60000 });
+    ok(/atualizado agora/.test(await page.textContent('.ph')), 'tela: detalhe buscado ao vivo ("atualizado agora")');
+    ok(!/Faturamento/.test(await page.textContent('#view')), 'tela: sem faturamento para o gestor');
+    ok(!(await page.$('[data-gt]')), 'tela: sem simulação de demonstração em produção');
+    await page.goto(`${raiz}#/torre/voo/${conta}?aba=campanhas`); await page.waitForTimeout(1500);
+    const bt = await page.$$eval('[data-voo-pausar],[data-voo-orc]', l => ({ n: l.length, off: l.every(b => b.disabled && /token/.test(b.title)) }));
+    ok(bt.n === 0 || bt.off, `tela: botões de ação desligados até o token (${bt.n})`);
+    ok(!(await page.$$eval('a[href]', l => l.some(a => /adsmanager|business\.facebook\.com/.test(a.href)))), 'tela: nenhum link para o Gerenciador');
+    ok(!erros.length, `tela: sem erros de console${erros.length ? ` (${erros.slice(0, 2).join(' | ')})` : ''}`);
+  } finally { await browser.close(); srv.close(); }
+}
 function limpar() {
-  sql(`delete from public.records where id in ('clients:c-voo-teste') or (col in ('activity','clientActions') and (data->>'quem' like 'u-voo-%' or data->>'quem' like 't-voo-%' or data->>'clientId' = 'c-voo-teste'));
-       delete from public.voo_cache where chave like 'vivo:%' and chave in (select 'vivo:' || id || ':' || c from auth.users, (select jsonb_array_elements_text(dados->'x') c from public.voo_cache where false) z);
+  sql(`delete from public.records where id in ('clients:c-voo-teste') or id like 'users:u-voo-%' or id like 'team:t-voo-%' or (col in ('activity','clientActions') and (data->>'quem' like 'u-voo-%' or data->>'quem' like 't-voo-%' or data->>'clientId' = 'c-voo-teste'));
+       delete from public.records_feed where rec_id like 'users:u-voo-%' or rec_id like 'team:t-voo-%' or rec_id = 'clients:c-voo-teste' or rec_id like 'activity:%' and em > now() - interval '1 hour' and rec_id not in (select id from public.records);
        delete from public.voo_mudancas where user_id in (select id from auth.users where email like '%${DOM}');
        delete from auth.users where email like '%${DOM}';`);
   sql(`delete from public.voo_cache where chave like 'vivo:%' and split_part(chave, ':', 2) not in (select id::text from auth.users)`);
@@ -106,6 +143,7 @@ try {
   const r = sql(`select public.voo_reservar_mudanca('gmarketing','voo-teste-obj','x',null,1,2,4) a, public.voo_reservar_mudanca('gmarketing','voo-teste-obj','x',null,1,2,4) b, public.voo_reservar_mudanca('gmarketing','voo-teste-obj','x',null,1,2,4) c, public.voo_reservar_mudanca('gmarketing','voo-teste-obj','x',null,1,2,4) d, public.voo_reservar_mudanca('gmarketing','voo-teste-obj','x',null,1,2,4) e`)[0];
   ok(r.a > 0 && r.d > 0 && r.e === -1, '4 reservas aceitas, a 5ª recusada');
   sql(`delete from public.voo_mudancas where objeto_id = 'voo-teste-obj'`);
+  if (process.env.OUT && process.env.SUPABASE_ESM_FILE) await telaProducao(gestor, contaTeste);
   const priv = await fetch(`${URL_SB}/rest/v1/voo_cache?select=chave&limit=1`, { headers: { apikey: ANON, Authorization: `Bearer ${tDono}` } });
   ok(priv.status === 401 || priv.status === 403 || (priv.ok && (await priv.json()).length === 0), `tabela voo_cache fechada para o navegador (${priv.status})`);
 } catch (e) { falhas++; console.log(`  ✗ erro: ${e.message}`); }

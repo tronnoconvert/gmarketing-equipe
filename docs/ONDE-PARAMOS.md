@@ -11,8 +11,8 @@
   (detalhe AO VIVO: KPIs, "por quê", investimento × teto, recomendações do motor, campanhas › conjuntos › anúncios, histórico).
 - Edge Functions novas publicadas: **voo-dados** (Windsor, cache ≤ 5 min, detalhe ao vivo) e **voo-acao** (Meta Graph API).
   Tabelas `voo_cache` e `voo_mudancas` + função `voo_reservar_mudanca` aplicadas no banco (fim do `policies.sql`).
-- Teste real `tests/live/voo.mjs`: 23/23 (72 contas ativas, gestor vê só a do cliente dele e sem receita, busca ao vivo ~2 s,
-  SIM/ver como/escopo/“não configurado” recusados no servidor, limite 4/h no banco) e limpeza completa.
+- Teste real `tests/live/voo.mjs`: 30/30 (72 contas ativas, gestor vê só a do cliente dele e sem receita, busca ao vivo ~2 s,
+  SIM/ver como/escopo/“não configurado” recusados no servidor, limite 4/h no banco, tela de produção sem erros) e limpeza completa.
 - **Pendente do dono:** `META_ACCESS_TOKEN` (DEPLOY §8.3) para liberar pausar/orçamento; cadastrar/importar os clientes e
   vincular as contas (o painel lista as 72 em "Contas sem cliente vinculado"); ligar o agendamento `aos-voo-dados` (DEPLOY §8.4).
 

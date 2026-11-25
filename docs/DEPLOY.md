@@ -333,4 +333,4 @@ Para desligar: `select cron.unschedule('aos-voo-dados');`.
 
 ### 8.5 Teste real
 `SQL_CMD=/caminho/q.sh node tests/live/voo.mjs` cria 2 logins e 1 cliente de teste, confere escopo, receita, busca ao vivo, regras das
-ações e o limite por hora, e apaga tudo no final (25/11/2026: 23/23).
+ações e o limite por hora, e apaga tudo no final; com `OUT=<build de produção>` e `SUPABASE_ESM_FILE` também abre a tela com o gestor de teste (25/11/2026: 30/30).
