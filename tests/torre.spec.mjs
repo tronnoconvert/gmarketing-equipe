@@ -157,6 +157,7 @@ export default async function (t) {
 
   step('Painel de Voo: orçamento com teto do cliente e limite de 4 por hora');
   await abrirConta('9000000000000106', 'campanhas');
+  await page.$$eval('details.lv-s', l => l.forEach(d => { d.open = true; })); await page.waitForTimeout(100);
   const orcId = await page.$eval('[data-voo-orc]', b => b.dataset.vooOrc);
   for (let k = 1; k <= 4; k++) {
     await page.click(`[data-voo-orc="${orcId}"]`); await page.waitForSelector('.ov-modal [name="valor"]');
