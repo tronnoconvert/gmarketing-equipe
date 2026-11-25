@@ -1,3 +1,18 @@
+# Onde paramos — 25/11/2026
+
+## No ar
+- Painel: https://painel.agenciagmarketing.com.br (Hostinger, pasta public_html/painel; subir o zip de `npm run build` → dist/ sem agencia-os.html).
+- Supabase hzonfbqsjxiwfmjywdlw: receita protegida no banco, senha provisória, 6 Edge Functions. APP_URL e Auth Site URL = painel.
+- Logins criados: Gabriel (dono) e Rayane (admin), senha provisória entregue ao dono. BOOTSTRAP_SECRET apagado.
+- GitHub: tronnoconvert/gmarketing-equipe (push funcionando).
+
+## Próximo (minha parte)
+1. **Item 17 — Painel de Voo nativo com dados reais (Windsor)** ANTES de liberar a equipe.
+2. Link Windsor para reconectar as 14 contas inativas.
+3. Campanha CA01/CA02/soma.
+4. Chaves Monday, Windsor, Z-API, Meta em Supabase › Edge Functions › Secrets (passar nomes exatos) e ligar crons (DEPLOY §2.8).
+
+---
 # Onde paramos — 25/11/2026 (retomar quando o dono disser "oi")
 
 ## Feito nesta etapa (Supabase de produção — projeto gmarketing-equipe, ref hzonfbqsjxiwfmjywdlw)
