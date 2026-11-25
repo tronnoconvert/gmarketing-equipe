@@ -6,6 +6,7 @@ import { MESES, MESES_PROJ, RECEITA, CUSTOS, PROJECAO } from '../financeiro/data
 import { estadoFatura } from '../financeiro/calc.js';
 import { padrao } from '../../core/padroes/index.js';
 import { limOcupacao, rotuloOcupacao } from '../operacao/lib.js';
+import { itensReais, renderReal } from './real.js'; // produção (db.dadosDemo false): tudo das coleções reais
 
 const RES_ID = 'cockpit-resolvidos';
 const SEM_EDICAO = 'Seu perfil só visualiza o Cockpit. Peça acesso de edição para marcar itens como resolvidos.';
@@ -16,6 +17,7 @@ function salvarResolvidos(db, itens, log) { db.upsert('finance', { id: RES_ID, i
 /** itens de "Precisa de você hoje" com dados vivos quando existirem */
 function itensHoje(ctx) {
   const { db, fmt } = ctx; const res = resolvidos(db);
+  if (!db.dadosDemo) return itensReais(ctx).map(it => (res[it.k] ? { ...it, resolvido: res[it.k] } : it));
   return ITENS.map(it => {
     const o = { ...it };
     if (it.fatura) {
@@ -45,7 +47,7 @@ function render(ctx) {
   const head = `<header class="ck-hd">
 <div class="ck-hd-t"><h1>${fmt.esc(saud)}, ${fmt.esc(fmt.primeiro(ctx.user.nome))}.</h1>
 <p>${pend.length ? `${ui.led(nErr ? 'err' : 'warn', false)}<span>Você tem <b>${fmt.esc(resumo)}</b></span>` : `${ui.led('ok', false)}<span>${fmt.esc(resumo)}</span>`}</p></div>
-<div class="ck-hd-m sm mut"><span>${fmt.esc(fmt.diaSemana(hoje))}, ${fmt.data(hoje)}</span><span aria-hidden="true">·</span><span>${fmt.esc(ctx.periodoInfo.rotulo)} ${fmt.esc(ctx.periodoInfo.comparacao)}</span><span aria-hidden="true">·</span><span>atualizado ${ui.rel(new Date(Date.now() - 4 * 60000).toISOString())}</span></div></header>`;
+<div class="ck-hd-m sm mut"><span>${fmt.esc(fmt.diaSemana(hoje))}, ${fmt.data(hoje)}</span><span aria-hidden="true">·</span><span>${fmt.esc(ctx.periodoInfo.rotulo)} ${fmt.esc(ctx.periodoInfo.comparacao)}</span><span aria-hidden="true">·</span><span>atualizado ${ui.rel(new Date(Date.now() - (db.dadosDemo ? 4 * 60000 : 0)).toISOString())}</span></div></header>`;
 
   const kpis = `<div class="ck-kpis">${ORDEM_KPI.map(k => { const K = KPIS[k], P = K[periodo] || K.mes; return ui.kpi({ rotulo: K.rotulo, valor: P.valor || K.valor, delta: P.delta, deltaBom: K.deltaBom, comp: P.comp, serie: P.serie, ajuda: K.ajuda, alerta: K.alerta, href: K.href, formatoSerie: K.formatoSerie, id: `ck-kpi-${k}` }); }).join('')}</div>`;
 

@@ -173,7 +173,7 @@
 @media (prefers-reduced-motion:reduce){.m-voo-ld svg,.m-voo-spin svg{animation:none}}
 .m-voo-kpis{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
 .m-voo-g{align-items:start}
-@media (max-width:700px){.m-voo-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:700px){.m-voo-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.m-voo-kpis .kpi:last-child:nth-child(odd){grid-column:1/-1}}
 .m-voo-nota,.m-voo-4g{display:flex;gap:8px;align-items:flex-start;margin:0;font-size:12.5px;color:var(--muted);line-height:1.45}
 .m-voo-nota svg,.m-voo-4g svg{flex:none;width:15px;height:15px;margin-top:1px}
 .m-voo-4g{padding:10px 12px;border-radius:var(--r-sm);background:var(--card-2);margin-bottom:14px;color:var(--fg2)}

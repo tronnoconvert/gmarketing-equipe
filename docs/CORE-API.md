@@ -190,7 +190,7 @@ export default async function (t) {
 ## Decisões e desvios do PLAN §4
 - Contrato do módulo usa `titulo/icone/grupo/rota` (aceita `title/icon`), mais `sub`, `perm`, `watch`, `contador`, `busca`.
 - `ctx.periodo` é o id (`'mes'|'tri'|'12m'`); detalhes em `ctx.periodoInfo`.
-- Torre: permissões separadas `torre` (Rotinas) e `torre_voo` (Painel de Voo); placeholder já traz o submenu e o iframe (`ui.embed`). No arquivo único, sem a pasta `torre/` ao lado, mostra estado vazio.
+- Torre: permissões separadas `torre` (Rotinas) e `torre_voo` (Painel de Voo). **Painel de Voo nativo (item 17)**: `src/modules/torre/voo.js` (telas), `voo-modelo.js` (pacote → contas, janelas, semáforo, motor de recomendações, frases), `voo-fonte.js` (produção: Edge Functions `voo-dados`/`voo-acao`; demonstração: `voo-demo.js`, dados fictícios no mesmo formato), `window.AOS_VOO` (testes). Campos novos em `clients`: `metaContas: ['<id da conta>']` (+ `metaAdAccountId` = `act_` da 1ª, usado pelo Guardião) e `metaCustoConversa` (R$). Ações gravam `clientActions` com `origem:'torre'`, `contaMeta`, `objetoId`; decisões do motor em `recsLog` com `origem:'torre'`, `conta`.
 - `db.seed(..., {chave})` permite várias sementes na mesma coleção; apagar todos os registros não ressemeia.
 - `excluir` segue a regra da seção 4. Notificações têm a linha `notificacoes` (todos editam as próprias).
 - Gráficos são redesenhados na largura real do contêiner (texto nunca encolhe no celular).

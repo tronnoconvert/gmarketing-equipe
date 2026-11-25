@@ -6,8 +6,18 @@
 - Logins criados: Gabriel (dono) e Rayane (admin), senha provisória entregue ao dono. BOOTSTRAP_SECRET apagado.
 - GitHub: tronnoconvert/gmarketing-equipe (push funcionando).
 
+## Painel de Voo nativo (item 17) — feito em 25/11
+- `#/torre/voo` (visão geral, semáforo por cliente, fila "Comece por aqui", contas sem cliente vinculado) e `#/torre/voo/<conta>`
+  (detalhe AO VIVO: KPIs, "por quê", investimento × teto, recomendações do motor, campanhas › conjuntos › anúncios, histórico).
+- Edge Functions novas publicadas: **voo-dados** (Windsor, cache ≤ 5 min, detalhe ao vivo) e **voo-acao** (Meta Graph API).
+  Tabelas `voo_cache` e `voo_mudancas` + função `voo_reservar_mudanca` aplicadas no banco (fim do `policies.sql`).
+- Teste real `tests/live/voo.mjs`: 23/23 (72 contas ativas, gestor vê só a do cliente dele e sem receita, busca ao vivo ~2 s,
+  SIM/ver como/escopo/“não configurado” recusados no servidor, limite 4/h no banco) e limpeza completa.
+- **Pendente do dono:** `META_ACCESS_TOKEN` (DEPLOY §8.3) para liberar pausar/orçamento; cadastrar/importar os clientes e
+  vincular as contas (o painel lista as 72 em "Contas sem cliente vinculado"); ligar o agendamento `aos-voo-dados` (DEPLOY §8.4).
+
 ## Próximo (minha parte)
-1. **Item 17 — Painel de Voo nativo com dados reais (Windsor)** ANTES de liberar a equipe.
+1. (Feito) Item 17 — Painel de Voo nativo com dados reais.
 2. (Decidido) Contas inativas do Windsor ficam de fora; gestor reconecta se precisar (docs/RECONECTAR-CONTA-WINDSOR.md).
 3. Campanha CA01/CA02/soma.
 4. Chaves Monday, Windsor, Z-API, Meta em Supabase › Edge Functions › Secrets (passar nomes exatos) e ligar crons (DEPLOY §2.8).

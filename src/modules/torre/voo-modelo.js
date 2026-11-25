@@ -33,9 +33,9 @@ function somar(a, l) {
   if (l[L.valor] != null) { a.valor += l[L.valor]; a.temValor = true; }
 }
 function juntar(lst) { const a = ZERO(); for (const x of lst) { a.gasto += x.gasto; a.impr += x.impr; a.alcance += x.alcance; a.alcMax = Math.max(a.alcMax, x.alcMax); a.cliques += x.cliques; a.link += x.link; a.leads += x.leads; a.conv += x.conv; a.compras += x.compras; a.valor += x.valor; a.temValor = a.temValor || x.temValor; } return a; }
-/** derivadas: CTR, CPM, CPC, frequência (alcance da janela ESTIMADO: maior alcance diário + 30% dos demais — a Windsor manda alcance por dia) */
+/** derivadas: CTR, CPM, CPC, frequência (alcance da janela ESTIMADO: maior alcance diário + 50% dos demais — a Windsor manda alcance por dia) */
 export function derivar(m) {
-  const alc = m.alcMax + 0.3 * Math.max(0, m.alcance - m.alcMax);
+  const alc = m.alcMax + 0.5 * Math.max(0, m.alcance - m.alcMax);
   return { ...m, alcanceEst: alc, ctr: m.impr ? (m.cliques / m.impr) * 100 : null, cpm: m.impr ? (m.gasto / m.impr) * 1000 : null, cpc: m.link ? m.gasto / m.link : null,
     freq: alc ? m.impr / alc : null, custoConv: m.conv ? m.gasto / m.conv : null, cpl: m.leads ? m.gasto / m.leads : null, cpa: m.compras ? m.gasto / m.compras : null, roas: m.temValor && m.gasto ? m.valor / m.gasto : null };
 }

@@ -6,18 +6,17 @@
 - Head de Tráfego: Allan Vieira — vê a central "Padrões e regras" junto com Dono/Rayane.
 
 ## Depois de hospedar (prioridade 1 — NÃO ESQUECER)
-- **Item 17 · Torre Meta Ads nativa dentro do app.** Reconstruir o Painel de Voo (hoje a Torre antiga embutida em iframe,
-  `public/torre/`, fontes em /home/user/torre2) como módulo nativo do Agência OS:
-  - mesmos clientes (`clients`), equipe (`team`), alertas, sino, permissões e "Ver como" do app;
-  - alterações (pausar, verba, criativo) gravadas em `clientActions`/`activity` e visíveis em Clientes › Resultados e ações;
-  - dados reais do Meta via Windsor (Edge Function `windsor-proxy`), confirmação "SIM", limite de 4 mudanças de orçamento/conjunto/hora,
-    sem links para o Gerenciador ("Criar ou subir campanha: somente pelo Gerenciador, via 4G.");
-  - "Ver como" (dono/admin vendo outro gestor) = somente visualização: nenhuma ação no Meta (checar auth.vendoComo()).
-  - usar o motor único de recomendações (item 18) e o fluxo "Pedir criativo / Avisar cliente".
-  - **teto de verba:** usar o teto de mídia do cadastro do cliente (`client.tetoMidiaMensal`, R$/mês) e o diário
-    `tetoDiarioCliente(c)` de `src/modules/clientes/calc.js` (mensal ÷ 30,4) para o aviso de teto de orçamento
-    (soma das verbas diárias ativas do cliente > teto diário → avisar antes de confirmar aumento de verba).
-  - Depois de pronto, remover o iframe e a pasta public/torre.
+- ✅ (25/11) **Item 17 · Painel de Voo nativo com dados reais** (`#/torre/voo`, `#/torre/voo/<conta>`). Iframe e `public/torre/`
+  removidos (fontes do protótipo continuam em `torre-prototipo/`). Detalhes: `docs/DEPLOY.md` §8.
+  - Dados reais via Windsor (Edge Function `voo-dados`, cache no servidor ≤ 5 min; detalhe do cliente sempre **ao vivo**, com
+    atualização a cada 2 min, "Atualizar agora" e nova busca depois de cada ação). Receita removida no servidor para quem não é Dono/Admin.
+  - Ações (`voo-acao`, Graph API do Meta): pausar campanha/conjunto/anúncio e orçamento diário, SIM obrigatório, 4 mudanças/conjunto/hora
+    no banco, só pausar (nunca reativar/excluir), "ver como" recusado, auditoria em `activity` + `clientActions`.
+  - Vínculo cliente ↔ conta: `clients.metaContas` (Clientes › Cadastro › Metas, ou "Contas sem cliente vinculado" no painel; Dono/Admin/Head)
+    e meta de custo por conversa (`clients.metaCustoConversa`) para o semáforo; teto `tetoDiarioCliente(c)`.
+  - **Falta o dono:** gerar o token do usuário do sistema do Meta e gravar `META_ACCESS_TOKEN` (passo a passo em DEPLOY §8.3) —
+    até lá a leitura funciona e os botões de ação ficam desligados com a explicação. Vincular as contas aos clientes quando
+    os clientes forem cadastrados/importados. Ligar o agendamento `aos-voo-dados` (DEPLOY §8.4).
 
 ## Também pendente para a hospedagem
 - ✅ (25/11) Regra "receita só para Dono/Admin" aplicada no banco (funções seguras + merge na gravação + realtime sem dados).
@@ -28,7 +27,7 @@
 - Windsor: usar só as contas ATIVAS (72). As 14 inativas ficam de fora por decisão do dono; se faltar alguma, o gestor reconecta seguindo docs/RECONECTAR-CONTA-WINDSOR.md.
 - Supabase: projeto "gmarketing-equipe" (ref hzonfbqsjxiwfmjywdlw, us-east-1) — banco, funções e config prontos; vazio.
 - ✅ (25/11) Login sem e-mail: senha provisória gerada pelo admin + troca obrigatória no 1º acesso (sem Resend).
-- Painel de Voo (item 17) pronto ANTES de liberar a equipe.
+- ✅ Painel de Voo (item 17) pronto ANTES de liberar a equipe (falta só o token do Meta para as ações).
 
 ## Fora do escopo por decisão do dono
 - Item 19 · tour de 60 segundos no primeiro acesso: NÃO fazer.
