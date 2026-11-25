@@ -290,8 +290,9 @@ Em produção os dados vêm do Meta pela **Windsor.ai** (`WINDSOR_API_KEY`, já 
   `META_ACCESS_TOKEN`, o **status e o orçamento** do detalhe vêm direto do Meta (Graph API), em tempo real.
 - Só as **contas ativas** da Windsor aparecem (decisão do dono). 1ª busca de todas as contas leva até ~2 min; depois é incremental
   (hoje e ontem; dias antigos 1×/dia). Alcance/frequência da semana são estimados (a Windsor manda alcance por dia).
-- Quem vê o quê (no servidor): Dono, Admin e Head de Tráfego veem **todas** as contas, inclusive as sem cliente; gestor de tráfego vê só
-  as contas ligadas aos **clientes dele**. Faturamento/ROAS (`action_values_purchase`) só para quem tem a permissão **receita**.
+- Quem vê o quê (no servidor): Dono, Admin e Head de Tráfego veem **todas** as contas, inclusive as sem cliente; gestor de tráfego vê (e opera)
+  **todas as contas ligadas a algum cliente** (decisão do dono, 25/11/2026: cobrir colega ausente), abrindo no filtro "Meus clientes";
+  contas sem cliente só Dono/Admin/Head. CS (`ver`) só as dos clientes dele. Faturamento/ROAS (`action_values_purchase`) só para quem tem a permissão **receita**.
 
 ### 8.2 Ligar cada conta ao cliente
 Clientes › (cliente) › Cadastro › Editar › **Metas**: "Contas de anúncios (Meta)" (`act_…`, várias separadas por vírgula — só Dono,
@@ -319,7 +320,7 @@ Passo a passo (feito uma vez pelo dono, no computador, logado no Facebook que ad
 
 Regras que valem no servidor (`voo-acao`), não só na tela: **SIM** obrigatório em toda alteração; só **pausar** e **orçamento diário**
 (reativar, arquivar e excluir não existem pelo painel; "Criar ou subir campanha: somente pelo Gerenciador, via 4G."); no máximo
-**4 mudanças de orçamento por conjunto (ou campanha CBO) por hora** (tabela `voo_mudancas`, função `voo_reservar_mudanca`);
+**10 mudanças de orçamento por conjunto (ou campanha CBO) por hora** (decisão do dono, 25/11/2026; era 4) (tabela `voo_mudancas`, função `voo_reservar_mudanca`);
 só contas do escopo da pessoa e o item precisa ser da conta (conferido no Meta); "ver como" recusado; conta em quarentena do Guardião
 recusada; tudo registrado em Administração › Auditoria e em Clientes › Resultados e ações. A única alteração sem SIM continua sendo a
 pausa automática do Guardião (invasão).

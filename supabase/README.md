@@ -19,7 +19,7 @@ supabase/
     routines-runner/    avalia as 7 regras de alerta, cria alertas, notifica e registra a execução
     guardiao/           segurança das contas Meta: detecta possível invasão, pausa a conta, quarentena e sirene (a cada 2 min)
     voo-dados/          Painel de Voo: Meta Ads de todas as contas via Windsor (cache ≤ 5 min; detalhe do cliente ao vivo), escopo e receita
-    voo-acao/           Painel de Voo: pausar e orçamento diário no Meta (SIM, 4 mudanças/conjunto/hora, auditoria) — META_ACCESS_TOKEN
+    voo-acao/           Painel de Voo: pausar e orçamento diário no Meta (SIM, 10 mudanças/conjunto/hora, auditoria) — META_ACCESS_TOKEN
   tests/
     supabase_stub.sql   simula o mínimo do Supabase num Postgres local (só para testes)
     rls_test.sql        92 verificações: RLS, receita (leitura filtrada + merge na gravação), senha provisória, anon, service role
@@ -59,7 +59,7 @@ supabase/
 * `can_col(col, ação)` usa a matriz de permissões (padrão `perm_padrao` + diferenças salvas em `settings:perms`) e o mapa
   coleção → módulos (`col_modules`, documentado no topo de `policies.sql`). Ver = 1, Editar = 2, Total = 4; excluir exige Total,
   ou Dono/Admin com Editar — igual a `perms.can` no front.
-* Escopo "seus clientes" (gestor de tráfego, CS, produção): `clients.respId`/`clients.equipe` contém o `team_id` da pessoa;
+* Escopo "seus clientes" (CS, produção; o gestor de tráfego vê todos os clientes desde 25/11/2026, sem receita): `clients.respId`/`clients.equipe` contém o `team_id` da pessoa;
   registros com `clientId` seguem o cliente.
 * Notificações: o destinatário lê e só altera `lida`; o remetente também enxerga o que enviou (exigência do upsert do front).
 * Auditoria (`activity`): só inserção, sempre em nome de quem grava; ninguém altera ou apaga.
