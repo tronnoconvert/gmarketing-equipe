@@ -747,3 +747,48 @@ grant execute on function public.registrar_senha_temporaria(uuid), public.usuari
 -- as funções de gravação não valem para anon
 revoke execute on function public.gravar_record(text, jsonb), public.apagar_record(text), public.concluir_troca_senha() from public, anon;
 grant execute on function public.gravar_record(text, jsonb), public.apagar_record(text), public.concluir_troca_senha() to authenticated;
+
+-- =====================================================================================
+-- PAINEL DE VOO (item 17) — cache dos dados do Meta (Windsor) e limite de mudanças de orçamento.
+-- Só o servidor (Edge Functions voo-dados / voo-acao, service role) lê e grava: RLS ligado e nenhuma política
+-- para anon/authenticated. O app recebe os dados já filtrados pelo escopo e sem receita pela função voo-dados.
+-- =====================================================================================
+create table if not exists public.voo_cache (
+  chave         text primary key,                    -- 'contas' | 'dia:aaaa-mm-dd' | 'trava'
+  dados         jsonb not null default '{}'::jsonb,
+  atualizado_em timestamptz not null default now()
+);
+create table if not exists public.voo_mudancas (
+  id        bigint generated always as identity primary key,
+  org_id    text,
+  objeto_id text not null,                           -- id do conjunto (ou campanha CBO / anúncio) no Meta
+  conta_id  text,
+  tipo      text not null check (tipo in ('orcamento', 'pausar')),
+  user_id   uuid,
+  quando    timestamptz not null default now(),
+  antes     numeric,
+  depois    numeric,
+  ok        boolean not null default true
+);
+create index if not exists voo_mudancas_obj_idx on public.voo_mudancas (objeto_id, quando desc);
+alter table public.voo_cache enable row level security;
+alter table public.voo_mudancas enable row level security;
+revoke all on public.voo_cache, public.voo_mudancas from anon, authenticated;
+grant select, insert, update, delete on public.voo_cache, public.voo_mudancas to service_role;
+
+-- reserva atômica de uma mudança de orçamento: no máximo p_limite por objeto na última hora (regra do Meta: 4/conjunto/hora).
+-- Devolve o id da reserva ou -1 se o limite foi atingido. A função voo-acao marca ok=false se o Meta recusar.
+create or replace function public.voo_reservar_mudanca(p_org text, p_objeto text, p_conta text, p_user uuid, p_antes numeric, p_depois numeric, p_limite int)
+returns bigint language plpgsql security definer set search_path = public as $$
+declare n int; v_id bigint;
+begin
+  perform pg_advisory_xact_lock(hashtext('voo:' || p_objeto));
+  select count(*) into n from public.voo_mudancas
+   where objeto_id = p_objeto and tipo = 'orcamento' and ok and quando > now() - interval '1 hour';
+  if n >= greatest(1, least(coalesce(p_limite, 4), 4)) then return -1; end if;
+  insert into public.voo_mudancas (org_id, objeto_id, conta_id, tipo, user_id, antes, depois)
+  values (p_org, p_objeto, p_conta, 'orcamento', p_user, p_antes, p_depois) returning id into v_id;
+  return v_id;
+end $$;
+revoke execute on function public.voo_reservar_mudanca(text, text, text, uuid, numeric, numeric, int) from public, anon, authenticated;
+grant execute on function public.voo_reservar_mudanca(text, text, text, uuid, numeric, numeric, int) to service_role;
