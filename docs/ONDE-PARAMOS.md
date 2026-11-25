@@ -8,7 +8,7 @@
 
 ## Próximo (minha parte)
 1. **Item 17 — Painel de Voo nativo com dados reais (Windsor)** ANTES de liberar a equipe.
-2. Link Windsor para reconectar as 14 contas inativas.
+2. (Decidido) Contas inativas do Windsor ficam de fora; gestor reconecta se precisar (docs/RECONECTAR-CONTA-WINDSOR.md).
 3. Campanha CA01/CA02/soma.
 4. Chaves Monday, Windsor, Z-API, Meta em Supabase › Edge Functions › Secrets (passar nomes exatos) e ligar crons (DEPLOY §2.8).
 

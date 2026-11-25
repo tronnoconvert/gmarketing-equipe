@@ -25,7 +25,7 @@
 - ✅ (25/11) Teste real com usuários de teste (`tests/live/producao.mjs`); falta o checklist com as pessoas reais.
 - Tela Campanha (conta própria do dono): **duas contas** — CA01 (act_1906477940242386) e CA02 · HOF (act_848802707655510), via Windsor.
   Adaptar o módulo para várias contas: seletor "CA01 / CA02 / As duas (somadas)".
-- Windsor: 72 contas Meta ativas; 14 inativas precisam de novo login no Windsor (link via get_connector_connect_info na hora de ligar o Painel de Voo).
+- Windsor: usar só as contas ATIVAS (72). As 14 inativas ficam de fora por decisão do dono; se faltar alguma, o gestor reconecta seguindo docs/RECONECTAR-CONTA-WINDSOR.md.
 - Supabase: projeto "gmarketing-equipe" (ref hzonfbqsjxiwfmjywdlw, us-east-1) — banco, funções e config prontos; vazio.
 - ✅ (25/11) Login sem e-mail: senha provisória gerada pelo admin + troca obrigatória no 1º acesso (sem Resend).
 - Painel de Voo (item 17) pronto ANTES de liberar a equipe.
