@@ -43,7 +43,9 @@ if (DEMO || !fs.existsSync(path.join(DIST, 'config.js'))) fs.writeFileSync(path.
 
 // HTML
 const html = fs.readFileSync(path.join(SRC, 'index.html'), 'utf8');
-fs.writeFileSync(path.join(DIST, 'index.html'), html);
+// versão nos links (?v=...) para o navegador e o CDN da hospedagem sempre buscarem os arquivos novos
+const ver = (await import('node:crypto')).createHash('sha1').update(fs.readFileSync(path.join(DIST, 'app.js'))).update(css).update(fs.readFileSync(path.join(DIST, 'config.js'))).digest('hex').slice(0, 10);
+fs.writeFileSync(path.join(DIST, 'index.html'), html.replace(/(src|href)="(\.\/)?(app\.js|app\.css|config\.js)"/g, (m, a, b = '', f) => `${a}="${b}${f}?v=${ver}"`));
 
 const js = fs.readFileSync(path.join(DIST, 'app.js'), 'utf8').replace(/<\/script/gi, '<\\/script');
 const cssInline = css.replace(/<\/style/gi, '<\\/style');

@@ -1,0 +1,10 @@
+# Gmarketing — a página e a configuração nunca ficam em cache (sempre a versão nova);
+# app.js/app.css vão com ?v=<versão> no link, então podem ficar em cache.
+<IfModule mod_headers.c>
+  <FilesMatch "\.(html|htm)$|^config\.js$">
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+    Header set Pragma "no-cache"
+    Header set Expires "0"
+  </FilesMatch>
+</IfModule>
+Options -Indexes
