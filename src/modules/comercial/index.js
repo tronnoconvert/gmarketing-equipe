@@ -202,7 +202,7 @@ async function mover(id, etapa, ctx) {
   const me = ctx.real || ctx.user; const resp = db.get('team', d.respId);
   if (resp && resp.userId && me && resp.userId !== me.id) ctx.notify.enviar({ para: [resp.userId], tipo: 'mensagem', titulo: `${fmt.primeiro(me.nome)} moveu ${d.empresa} para ${E[etapa].rotulo}`, texto: `${mrr(d.valor)} · antes: ${E[d.etapa].rotulo}`, link: `#/comercial/pipeline?deal=${id}`, refCol: 'deals', refId: id });
   if (etapa === 'ganho') {
-    ctx.notify.enviar({ para: ['u-gabriel', 'u-paulo'].filter(u => !me || u !== me.id), tipo: 'sistema', titulo: `Negócio ganho: ${d.empresa}`, texto: `${mrr(d.valor)} · ${d.servicos.join(', ')}. Falta cadastrar como cliente.`, link: `#/comercial/pipeline?deal=${id}`, refCol: 'deals', refId: id });
+    ctx.notify.enviar({ para: (db.dadosDemo ? ['u-gabriel', 'u-paulo'] : db.list('users', u => u.ativo !== false && ['dono', 'financeiro'].includes(u.papel)).map(u => u.id)).filter(u => !me || u !== me.id), tipo: 'sistema', titulo: `Negócio ganho: ${d.empresa}`, texto: `${mrr(d.valor)} · ${d.servicos.join(', ')}. Falta cadastrar como cliente.`, link: `#/comercial/pipeline?deal=${id}`, refCol: 'deals', refId: id });
     ui.toast(`${d.empresa} ganho! ${mrr(d.valor)} no novo MRR do mês.`, { desfazer: () => db.update('deals', id, antes), acao: { rotulo: 'Cadastrar como cliente', fn: () => { location.hash = `#/clientes/novo?deal=${encodeURIComponent(id)}`; } }, duracao: 10000 });
   } else ui.toast(`${novo.empresa} movido para ${E[etapa].rotulo}.`, { desfazer: () => db.update('deals', id, antes) });
 }

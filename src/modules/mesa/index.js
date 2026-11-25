@@ -44,7 +44,7 @@ function formCheckin(c, it) {
   const atual = checkinDeHoje(c.me);
   return `<form class="m-mesa-ck" data-ck-form novalidate${ckAberto ? '' : ' hidden'}>
 <div class="m-mesa-ck-g">
-${ui.campo({ nome: 'fiz', rotulo: 'O que fiz', tipo: 'textarea', obrigatorio: true, valor: atual && atual.fiz, linhas: 2, placeholder: 'Ex.: Subi a campanha de remarketing do Grupo Orion.' })}
+${ui.campo({ nome: 'fiz', rotulo: 'O que fiz', tipo: 'textarea', obrigatorio: true, valor: atual && atual.fiz, linhas: 2, placeholder: 'Ex.: Subi a campanha de remarketing do cliente.' })}
 ${ui.campo({ nome: 'farei', rotulo: 'O que farei', tipo: 'textarea', obrigatorio: true, valor: (atual && atual.farei) || '', linhas: 2, placeholder: 'Ex.: Fechar o relatório de outubro.' })}
 ${ui.campo({ nome: 'bloqueios', rotulo: 'Bloqueios', tipo: 'textarea', valor: atual && atual.bloqueios, linhas: 2, placeholder: 'Deixe em branco se não houver', dica: 'Se houver bloqueio, seu gestor é avisado.' })}
 </div>

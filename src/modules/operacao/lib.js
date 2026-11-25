@@ -147,7 +147,8 @@ export function desfazer(r) { if (!r) return; db.batch(() => { db.insert('tasks'
 export function criarTarefa(d) {
   const u = eu();
   const rc = cliente(d.clientId).respId;
-  const aprovadorId = d.aprovadorId || (rc && rc !== d.respId ? rc : 't-gabriel');
+  const dono = db.dadosDemo ? 't-gabriel' : (db.find('users', x => x.papel === 'dono' && x.ativo !== false) || {}).teamId || null;
+  const aprovadorId = d.aprovadorId || (rc && rc !== d.respId ? rc : dono);
   const t = db.insert('tasks', {
     titulo: d.titulo, clientId: d.clientId, respId: d.respId, tipo: d.tipo, status: 'afazer', prazo: d.prazo, estimativaH: Number(d.estimativaH) || 0, horasGastas: 0,
     aprovadorId, checklist: [], retrabalho: 0, projetoId: d.projetoId || null, desc: d.desc || '', prioridade: diasPara(d.prazo) <= 1 ? 'alta' : 'normal',

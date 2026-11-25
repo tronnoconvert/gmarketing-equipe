@@ -50,8 +50,9 @@ function estadoDe(w) { return semDinheiro(estadoDe0(w)); }
 function estadoDe0(w) {
   if (!w) {
     return {
-      id: null, tema: '', data: '', hora: '20:00', apresentador: 't-gabriel', plataforma: 'YouTube', oferta: '', ticket: null, metaInscritos: null, metaVendas: null, orcamento: null,
-      equipe: EQUIPE_PADRAO.map(e => ({ ...e, secoes: [...e.secoes] })), origem: {}, aovivo: { curva: [] }, vendas: {}, pos: {}, notas: '', cap: [], ven: [],
+      id: null, tema: '', data: '', hora: '20:00', apresentador: db.dadosDemo ? 't-gabriel' : ((auth.user() || {}).teamId || ''), plataforma: 'YouTube', oferta: '', ticket: null, metaInscritos: null, metaVendas: null, orcamento: null,
+      // equipe sugerida: a de exemplo no modo demonstração; em produção só quem existe no cadastro
+      equipe: EQUIPE_PADRAO.filter(e => db.dadosDemo || db.get('team', e.id)).map(e => ({ ...e, secoes: [...e.secoes] })), origem: {}, aovivo: { curva: [] }, vendas: {}, pos: {}, notas: '', cap: [], ven: [],
     };
   }
   const d = diario(w.id);

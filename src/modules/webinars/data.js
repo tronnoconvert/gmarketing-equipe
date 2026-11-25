@@ -31,6 +31,7 @@ export const CHECKLIST_PADRAO = [
 export function checklistPadrao(data, feitoAte) {
   return CHECKLIST_PADRAO.map(([item, resp, d], i) => {
     const prazo = data ? dISO(data, d) : null; const feito = !!(feitoAte && prazo && prazo <= feitoAte);
+    if (!db.dadosDemo && !db.get('team', resp)) resp = null; // produção: responsável de exemplo que não existe fica em aberto
     return { id: `ck-${i + 1}`, item, resp, prazo, feito, feitoEm: feito ? `${prazo}T18:00:00.000Z` : null, feitoPor: feito ? resp : null };
   });
 }
