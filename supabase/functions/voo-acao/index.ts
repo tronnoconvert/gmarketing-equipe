@@ -60,7 +60,7 @@ Deno.serve(servir(async (req) => {
     const valor = Number(b.valor);
     const pad = (await obter(q.org, 'settings', 'padroes'))?.valor as Record<string, unknown> | undefined;
     const minimo = Math.max(6, Number(pad?.['orcamento.minimoDia']) || 6);
-    const limite = Math.min(4, Math.max(1, Number(pad?.['orcamento.maxMudancasHora']) || 4));
+    const limite = Math.min(10, Math.max(1, Number(pad?.['orcamento.maxMudancasHora']) || 10));
     if (!isFinite(valor) || valor < minimo || valor > 100000) throw new HttpError(400, `Orçamento diário inválido: mínimo ${brl(minimo)}, máximo ${brl(100000)}.`, 'validacao');
     if (atual.daily_budget == null) throw new HttpError(400, `Este item não tem orçamento diário próprio (${nivel === 'conjunto' ? 'a campanha é CBO: mude na campanha' : 'a campanha é ABO: mude nos conjuntos'}).`, 'validacao');
     const ant = Number(atual.daily_budget) / 100;

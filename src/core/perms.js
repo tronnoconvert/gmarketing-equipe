@@ -7,7 +7,7 @@ export const PAPEIS = {
   dono: { rotulo: 'Dono', desc: 'Acesso total, inclusive Campanha (conta própria) e "Ver como".' },
   admin: { rotulo: 'Administrador', desc: 'Sócia(o) administrador(a): mesmo acesso do Dono (Campanha, receita, "Ver como"), usuários, permissões e cadastros.' },
   head_trafego: { rotulo: 'Head de tráfego', desc: 'Tudo do gestor de tráfego em todas as contas (clientes, Torre e Painel de Voo) + edita a central Padrões e regras.' },
-  gestor_trafego: { rotulo: 'Gestor de tráfego', desc: 'Edita os próprios clientes, operação, Torre e Painel de Voo das suas contas.' },
+  gestor_trafego: { rotulo: 'Gestor de tráfego', desc: 'Vê e opera todos os clientes e contas (para cobrir colegas); "Meus clientes" vem primeiro. Não vê receita.' },
   cs: { rotulo: 'Atendimento (CS)', desc: 'Edita os próprios clientes, operação e webinars; vê a Torre.' },
   producao: { rotulo: 'Produção', desc: 'Social, design, copy e dev: vê os próprios clientes e edita as suas tarefas.' },
   financeiro: { rotulo: 'Financeiro', desc: 'Edita o Financeiro; vê Cockpit, clientes, equipe e comercial.' },
@@ -33,11 +33,11 @@ export const MATRIZ_PADRAO = {
   mesa: L('editar', 'editar', 'editar', 'editar', 'editar', 'editar', 'editar', 'editar', 'ver'),
   cockpit: L('admin', 'editar', '', '', '', '', '', '', ''),
   financeiro: L('admin', 'editar', '', '', '', '', '', '', ''),
-  clientes: L('admin', 'editar', 'editar', 'editar:seus', 'editar:seus', 'ver:seus', 'ver', 'ver', 'ver'),
+  clientes: L('admin', 'editar', 'editar', 'editar', 'editar:seus', 'ver:seus', 'ver', 'ver', 'ver'),
   operacao: L('admin', 'editar', 'editar', 'editar', 'editar', 'editar:seus', '', '', 'ver'),
   equipe: L('admin', 'editar', 'ver:proprio', 'ver:proprio', 'ver:proprio', 'ver:proprio', 'ver', 'ver:proprio', ''),
   torre: L('admin', 'editar', 'editar', 'ver', 'ver', '', '', '', 'ver'),
-  torre_voo: L('admin', 'editar', 'editar', 'editar:seus', 'ver', '', '', '', 'ver'),
+  torre_voo: L('admin', 'editar', 'editar', 'editar', 'ver', '', '', '', 'ver'),
   comercial: L('admin', 'editar', '', '', '', '', 'ver', 'editar', ''),
   alertas: L('admin', 'editar', 'ver', 'ver:seus', 'ver:seus', 'ver:seus', 'ver:seus', 'ver:seus', 'ver'),
   webinars: L('admin', 'editar', 'editar', 'editar', 'editar', 'editar:seus', 'ver', 'ver', 'ver'),
@@ -93,11 +93,18 @@ export function can(mod, acao = 'ver', user) {
   return r >= need;
 }
 
+/** ids dos clientes do usuário (respId/equipe), independente do escopo — filtro padrão "Meus" do gestor */
+export function meusClientes(user) {
+  user = user === undefined ? auth.user() : user;
+  if (!user) return [];
+  const t = user.teamId;
+  return db.list('clients', c => c.respId === t || (Array.isArray(c.equipe) && c.equipe.includes(t))).map(c => c.id);
+}
 /** 'todos' ou array de clientIds sob responsabilidade do usuário (clients.respId === teamId ou clients.equipe inclui teamId) */
 export function escopoClientes(user) {
   user = user === undefined ? auth.user() : user;
   if (!user) return [];
-  const limitado = ['gestor_trafego', 'cs', 'producao'].includes(user.papel) || escopo('clientes', user) === 'seus';
+  const limitado = ['cs', 'producao'].includes(user.papel) || escopo('clientes', user) === 'seus';
   if (!limitado) return 'todos';
   const t = user.teamId;
   return db.list('clients', c => c.respId === t || (Array.isArray(c.equipe) && c.equipe.includes(t))).map(c => c.id);
@@ -110,5 +117,5 @@ export function filtrarPorEscopo(lista, campo = 'clientId', user) { const e = es
 export function veReceita(user) { return can('receita', 'ver', user); }
 export function rotuloPapel(p) { return (PAPEIS[p] || {}).rotulo || p; }
 
-export const perms = { PAPEIS, PAPEIS_ORDEM, MODULOS_PERM, MATRIZ_PADRAO, NIVEL_ROTULO, ESCOPO_ROTULO, matriz, salvarMatriz, restaurarPadrao, nivel, escopo, can, escopoClientes, podeCliente, filtrarPorEscopo, rotuloPapel, veReceita };
+export const perms = { PAPEIS, PAPEIS_ORDEM, MODULOS_PERM, MATRIZ_PADRAO, NIVEL_ROTULO, ESCOPO_ROTULO, matriz, salvarMatriz, restaurarPadrao, nivel, escopo, can, escopoClientes, meusClientes, podeCliente, filtrarPorEscopo, rotuloPapel, veReceita };
 export default perms;

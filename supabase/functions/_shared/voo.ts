@@ -35,7 +35,7 @@ export function diaLocal(desloc = 0): string {
 export const listaDias = () => Array.from({ length: DIAS }, (_, i) => diaLocal(i - (DIAS - 1)));
 
 /* ---------------------------------------------------------------- quem chama: nível, receita e escopo */
-export interface QuemVoo { c: Chamador; org: string; nivel: number; veReceita: boolean; limitado: boolean; clientIds: string[]; teamId: string | null; nome: string }
+export interface QuemVoo { c: Chamador; org: string; nivel: number; veReceita: boolean; limitado: boolean; soVinculadas: boolean; clientIds: string[]; teamId: string | null; nome: string }
 export async function quemVoo(c: Chamador, req: Request): Promise<QuemVoo> {
   if (c.sistema || !c.perfil) throw new HttpError(403, 'Use sua sessão do Agência OS.', 'sem_permissao');
   const token = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '').trim();
@@ -46,7 +46,7 @@ export async function quemVoo(c: Chamador, req: Request): Promise<QuemVoo> {
   const nivel = Number(r1.data) || 0;
   if (nivel < 1) throw new HttpError(403, 'Seu papel não tem acesso ao Painel de Voo. Peça ao administrador.', 'sem_permissao');
   const { data: u } = await adminClient().from('records').select('data').eq('id', `users:${c.perfil.app_user_id}`).maybeSingle();
-  return { c, org: c.perfil.org_id, nivel, veReceita: !!r2.data, limitado: !!r3.data, clientIds: (r4.data as string[]) ?? [], teamId: c.perfil.team_id, nome: String((u?.data as Record<string, unknown> | undefined)?.nome ?? c.email ?? 'Alguém') };
+  return { c, org: c.perfil.org_id, nivel, veReceita: !!r2.data, limitado: !!r3.data, soVinculadas: !r3.data && !['dono', 'admin', 'head_trafego'].includes(c.perfil.papel), clientIds: (r4.data as string[]) ?? [], teamId: c.perfil.team_id, nome: String((u?.data as Record<string, unknown> | undefined)?.nome ?? c.email ?? 'Alguém') };
 }
 
 /** conta Meta → cliente do app (clients.metaContas, ou o antigo metaAdAccountId) */
@@ -58,9 +58,10 @@ export async function mapaContas(org: string): Promise<Map<string, { clientId: s
   }
   return m;
 }
-/** a pessoa pode ver esta conta? sem escopo limitado = todas (inclusive as sem cliente); limitado = só contas dos seus clientes */
+/** a pessoa pode ver esta conta? Dono/Admin/Head = todas (inclusive as sem cliente); gestor de tráfego (decisão do dono, 25/11/2026:
+ *  cobre colega ausente) = todas as contas VINCULADAS a algum cliente; escopo limitado (CS/produção) = só contas dos seus clientes */
 export function podeConta(q: QuemVoo, mapa: Map<string, { clientId: string }>, conta: string): boolean {
-  if (!q.limitado) return true;
+  if (!q.limitado) return !q.soVinculadas || mapa.has(conta);
   const l = mapa.get(conta); return !!l && q.clientIds.includes(l.clientId);
 }
 
@@ -225,10 +226,10 @@ export function montarPacote(q: QuemVoo, contasLista: Conta[], diasDados: Map<st
     for (const r of x.rows) if (ads[String(r[0])]) { const l = [i, ...r]; if (!q.veReceita) l[10] = null; linhas.push(l); }
   });
   const contas = [...todas.values()].filter((c) => ok(c.id)).map((c) => ({ ...c, clientId: (mapa.get(c.id) || {} as { clientId?: string }).clientId ?? null }));
-  return { dias, contas, camps, sets, ads, linhas, veReceita: q.veReceita, escopo: q.limitado ? 'seus' : 'todos' };
+  return { dias, contas, camps, sets, ads, linhas, veReceita: q.veReceita, escopo: q.limitado ? 'seus' : 'todos', meus: q.clientIds };
 }
 
-/** mudanças de orçamento da última hora (para o "Mudanças nesta hora: 2/4" da tela) */
+/** mudanças de orçamento da última hora (para o "Mudanças nesta hora: 2/10" da tela) */
 export async function mudancasHora(contas: string[]): Promise<Record<string, string[]>> {
   if (!contas.length) return {};
   const { data, error } = await adminClient().from('voo_mudancas').select('objeto_id,quando').eq('tipo', 'orcamento').eq('ok', true)

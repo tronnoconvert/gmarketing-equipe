@@ -7,7 +7,8 @@
 --   2) settings:perms       = diferenças salvas pelo app (sobrepõem o padrão)
 --   3) public.col_modules   = de qual(is) módulo(s) cada coleção depende (mapa abaixo)
 --   4) can_col(col, ação)   = o papel tem o nível exigido em algum módulo da coleção
---   5) escopo de clientes   = gestor_trafego, cs e produção só veem registros dos SEUS clientes
+--   5) escopo de clientes   = cs e produção só veem registros dos SEUS clientes (gestor de tráfego vê todos desde 25/11/2026;
+--                             a receita continua cortada por ve_receita)
 --
 -- Níveis: '' (sem acesso) < ver (1) < editar (2) < admin/Total (4). Sufixos :seus / :proprio = escopo.
 -- Ações: select exige ver · insert/update exigem editar · delete exige admin, ou dono/admin com editar
@@ -45,11 +46,11 @@ select m, p, v from (values
   ('mesa',         array['editar','editar','editar','editar','editar','editar','editar','editar','ver']),
   ('cockpit',      array['admin','editar','','','','','','','']),
   ('financeiro',   array['admin','editar','','','','','','','']),
-  ('clientes',     array['admin','editar','editar','editar:seus','editar:seus','ver:seus','ver','ver','ver']),
+  ('clientes',     array['admin','editar','editar','editar','editar:seus','ver:seus','ver','ver','ver']),
   ('operacao',     array['admin','editar','editar','editar','editar','editar:seus','','','ver']),
   ('equipe',       array['admin','editar','ver:proprio','ver:proprio','ver:proprio','ver:proprio','ver','ver:proprio','']),
   ('torre',        array['admin','editar','editar','ver','ver','','','','ver']),
-  ('torre_voo',    array['admin','editar','editar','editar:seus','ver','','','','ver']),
+  ('torre_voo',    array['admin','editar','editar','editar','ver','','','','ver']),
   ('comercial',    array['admin','editar','','','','','ver','editar','']),
   ('alertas',      array['admin','editar','ver','ver:seus','ver:seus','ver:seus','ver:seus','ver:seus','ver']),
   ('webinars',     array['admin','editar','editar','editar','editar','editar:seus','ver','ver','ver']),
@@ -194,7 +195,7 @@ $$;
 create or replace function public.escopo_limitado(p_col text) returns boolean
 language sql stable security definer set search_path = public as $$
   select exists (select 1 from public.col_modules where col = p_col and escopo_cliente)
-     and (public.my_role() in ('gestor_trafego','cs','producao') or public.perm_escopo('clientes') = 'seus')
+     and (public.my_role() in ('cs','producao') or public.perm_escopo('clientes') = 'seus')
 $$;
 
 -- o registro está no escopo do usuário? (para coleções ligadas a clientes)
@@ -776,7 +777,7 @@ alter table public.voo_mudancas enable row level security;
 revoke all on public.voo_cache, public.voo_mudancas from anon, authenticated;
 grant select, insert, update, delete on public.voo_cache, public.voo_mudancas to service_role;
 
--- reserva atômica de uma mudança de orçamento: no máximo p_limite por objeto na última hora (regra do Meta: 4/conjunto/hora).
+-- reserva atômica de uma mudança de orçamento: no máximo p_limite por objeto na última hora (regra do dono: 10/conjunto/hora).
 -- Devolve o id da reserva ou -1 se o limite foi atingido. A função voo-acao marca ok=false se o Meta recusar.
 create or replace function public.voo_reservar_mudanca(p_org text, p_objeto text, p_conta text, p_user uuid, p_antes numeric, p_depois numeric, p_limite int)
 returns bigint language plpgsql security definer set search_path = public as $$
@@ -785,7 +786,7 @@ begin
   perform pg_advisory_xact_lock(hashtext('voo:' || p_objeto));
   select count(*) into n from public.voo_mudancas
    where objeto_id = p_objeto and tipo = 'orcamento' and ok and quando > now() - interval '1 hour';
-  if n >= greatest(1, least(coalesce(p_limite, 4), 4)) then return -1; end if;
+  if n >= greatest(1, least(coalesce(p_limite, 10), 10)) then return -1; end if;
   insert into public.voo_mudancas (org_id, objeto_id, conta_id, tipo, user_id, antes, depois)
   values (p_org, p_objeto, p_conta, 'orcamento', p_user, p_antes, p_depois) returning id into v_id;
   return v_id;

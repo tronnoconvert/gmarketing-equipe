@@ -3,7 +3,7 @@
 //   #/torre/voo                → visão geral: semáforo por cliente, fila "Comece por aqui", contas sem cliente vinculado
 //   #/torre/voo/:conta?aba=    → detalhe do cliente (sempre AO VIVO): KPIs, "por quê", investimento × teto, recomendações do
 //                                motor único, campanhas › conjuntos › anúncios (pausar e orçamento com SIM), histórico
-// Regras do dono: SIM em toda alteração; máx. 4 mudanças de orçamento por conjunto/hora (também no servidor); só pausar (nunca
+// Regras do dono: SIM em toda alteração; máx. 10 mudanças de orçamento por conjunto/hora (também no servidor); só pausar (nunca
 // excluir); sem links para o Gerenciador ("Criar ou subir campanha: somente pelo Gerenciador, via 4G."); "Ver como" = só ver;
 // receita só para Dono/Admin (o servidor já tira). A única alteração sem SIM é a pausa automática do Guardião (invasão).
 import { db } from '../../core/store.js';
@@ -126,7 +126,9 @@ ${ui.kpi({ rotulo: 'Pedindo ação', valor: String(nAt), alerta: nAt > 0, href: 
     return `<li class="m-voo-fi p-${c.prioridade}"><span class="m-voo-fi-p">${ui.selo(p[0], p[1])}</span><div class="m-voo-fi-t"><a href="#/torre/voo/${c.id}"><b>${fmt.esc(nomeCliente(c))}</b></a><span>${fmt.esc(txt)}</span></div>${selo(c)}${ui.btn({ rotulo: 'Abrir', sm: true, iconeDir: 'arrow-right', href: `#/torre/voo/${c.id}` })}</li>`; }).join('')}</ol>`
     : ui.vazio({ icone: 'check-circle', titulo: 'Nada urgente agora', texto: 'Nenhuma conta com ação para agora ou hoje. As demais recomendações estão dentro de cada cliente.', compacto: true });
 
-  const f = FILTROS.some(x => x.id === ctx.query.f) ? ctx.query.f : 'todas';
+  // gestor de tráfego vê todas as contas vinculadas (cobre colega ausente), mas abre em "Meus clientes" (decisão do dono, 25/11/2026)
+  const padraoF = (ctx.user || {}).papel === 'gestor_trafego' && filtrar(todas, 'meus', ctx).length ? 'meus' : 'todas';
+  const f = FILTROS.some(x => x.id === ctx.query.f) ? ctx.query.f : padraoF;
   const filtros = FILTROS.filter(x => x.id !== 'semcliente' || todas.some(c => !c.cliente)).map(x => ({ ...x, n: filtrar(todas, x.id, ctx).length }));
   const lista = filtrar(todas, f, ctx);
   const tabela = ui.tabela({
@@ -279,7 +281,7 @@ function abaCampanhas(ctx, c, bq) {
 <div class="m-voo-na">${bPausar(s, 'conjunto')}${!cp.cbo ? bOrc(s, 'conjunto') : ''}</div>
 <ul class="m-voo-ads">${s.ads.map(a => `<li class="m-voo-ad${ATIVO(a.st) ? '' : ' off'}"><span class="m-voo-lv">${ui.ic('eye')}Anúncio</span><div class="m-voo-nt"><b>${fmt.esc(a.n)}</b><small>freq. 7d ${a.m.d7.freq ? fmt.dec(a.m.d7.freq, 1) : '—'}</small></div>${stHtml(a)}${metr(a, c)}<div class="m-voo-na">${bPausar(a, 'anuncio')}${ui.btn({ rotulo: 'Pedir criativo novo', icone: 'users', sm: true, tipo: 'ghost', attrs: { 'data-voo-criativo': a.id }, disabled: auth.vendoComo() || !ctx.can('torre_voo', 'editar') })}</div></li>`).join('')}</ul>
 </details>`).join('')}</div></details>`).join('');
-  return `${ui.card({ titulo: 'Campanhas, conjuntos e anúncios', sub: `${c.camps.length} campanha(s) com veiculação nos últimos 14 dias`, ajuda: 'Cada botão age só no nível da caixa em que está. Pausar e mudar orçamento pedem SIM. Máximo de 4 mudanças de orçamento por conjunto (ou campanha CBO) por hora. Reativar e excluir não são feitos por aqui.',
+  return `${ui.card({ titulo: 'Campanhas, conjuntos e anúncios', sub: `${c.camps.length} campanha(s) com veiculação nos últimos 14 dias`, ajuda: 'Cada botão age só no nível da caixa em que está. Pausar e mudar orçamento pedem SIM. Máximo de 10 mudanças de orçamento por conjunto (ou campanha CBO) por hora. Reativar e excluir não são feitos por aqui.',
     corpo: `<p class="m-voo-4g">${ui.ic('lock')}<span><b>${AVISO_4G}</b> Aqui você pausa e ajusta o orçamento do que já existe. Toda alteração pede SIM.</span></p><div class="m-voo-inv">${ui.ic('wallet')}<p><b>${fmt.esc(fraseInvestimento(c).texto)}</b> <span>${fmt.esc(fraseInvestimento(c).textoTeto)}</span></p></div>${arvore || ui.vazio({ titulo: 'Nenhuma campanha com veiculação', texto: 'Nos últimos 14 dias esta conta não teve gasto.', compacto: true })}` })}`;
 }
 const objetivo = o => ({ OUTCOME_ENGAGEMENT: 'Engajamento / mensagens', OUTCOME_LEADS: 'Cadastros', OUTCOME_SALES: 'Vendas', OUTCOME_TRAFFIC: 'Tráfego', OUTCOME_AWARENESS: 'Reconhecimento', MESSAGES: 'Mensagens' }[o] || o || 'Objetivo não informado');

@@ -1,6 +1,6 @@
 // voo-fonte.js — Painel de Voo: de onde vêm os dados e como as ações vão para o Meta.
 //  - Produção (db.mode 'supabase'): Edge Function voo-dados (visão geral pelo cache do servidor, no máximo 5 min; detalhe do
-//    cliente AO VIVO, sem cache) e voo-acao (pausar / orçamento, com SIM, 4 mudanças por conjunto por hora e auditoria no servidor).
+//    cliente AO VIVO, sem cache) e voo-acao (pausar / orçamento, com SIM, 10 mudanças por conjunto por hora e auditoria no servidor).
 //  - Demonstração (testes, Protótipo Oficial): dados fictícios de voo-demo.js, com as mesmas regras simuladas aqui
 //    (escopo, receita, limite por hora, atraso do Meta/Windsor para confirmar a ação).
 // Frescor (regra do dono): o detalhe do cliente sempre busca ao vivo ao abrir, atualiza a cada 2 min com a aba visível,
@@ -54,7 +54,9 @@ function pacoteDemo(soConta) {
   const clientes = db.list('clients');
   const ligada = new Map(); clientes.forEach(c => (c.metaContas || []).forEach(a => ligada.set(String(a).replace(/\D/g, ''), c)));
   const esc = perms.escopoClientes();
-  const ok = id => (esc === 'todos' || (ligada.has(id) && esc.includes(ligada.get(id).id))) && (!soConta || id === soConta);
+  // gestor de tráfego: todas as contas VINCULADAS a cliente; sem cliente só Dono/Admin/Head
+  const soVinc = esc === 'todos' && !['dono', 'admin', 'head_trafego'].includes((auth.user() || {}).papel);
+  const ok = id => (esc === 'todos' ? (!soVinc || ligada.has(id)) : (ligada.has(id) && esc.includes(ligada.get(id).id))) && (!soConta || id === soConta);
   b.contas = b.contas.filter(c => ok(c.id)).map(c => ({ ...c, clientId: ligada.has(c.id) ? ligada.get(c.id).id : null }));
   const cs = new Set(Object.keys(b.camps).filter(id => ok(String(b.camps[id].c))));
   for (const k of Object.keys(b.camps)) if (!cs.has(k)) delete b.camps[k];
@@ -140,7 +142,7 @@ export function mudancasNaHora(objId, pac) {
   const l = ((pac && pac.mudancasHora) || (est.geral && est.geral.mudancasHora) || {})[objId] || [];
   return l.map(t => Date.parse(t)).filter(t => Date.now() - t < 36e5).sort();
 }
-export const limiteHora = () => Math.min(4, Math.max(1, Number(padrao('orcamento.maxMudancasHora', 4)) || 4));
+export const limiteHora = () => Math.min(10, Math.max(1, Number(padrao('orcamento.maxMudancasHora', 10)) || 10));
 
 /**
  * envia a ação (já confirmada com SIM na tela). a = {acao:'pausar'|'orcamento', nivel, id, conta, valor?, via?}
