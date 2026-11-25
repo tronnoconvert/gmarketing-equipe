@@ -48,3 +48,9 @@ select cron.schedule('aos-guardiao', '*/2 * * * *', $$select public.aos_chamar_f
 -- quando alguém abre o painel e o cache passou de 5 minutos (mostra o que tem e atualiza em segundo plano).
 select cron.unschedule('aos-voo-dados') where exists (select 1 from cron.job where jobname = 'aos-voo-dados');
 select cron.schedule('aos-voo-dados', '*/5 * * * *', $$select public.aos_chamar_funcao('voo-dados', '{"acao":"atualizar"}'::jsonb)$$);
+
+-- Backup lógico diário (docs/BACKUP-E-RESTAURACAO.md): todas as tabelas do app em gzip no bucket PRIVADO `backups`
+-- (diario/AAAA-MM-DD.json.gz + manifesto com contagens e sha256). 06:10 UTC = 03:10 em São Paulo.
+-- Retenção feita pela própria função: 35 dias; o dia 1º de cada mês fica 12 meses.
+select cron.unschedule('aos-backup-diario') where exists (select 1 from cron.job where jobname = 'aos-backup-diario');
+select cron.schedule('aos-backup-diario', '10 6 * * *', $$select public.aos_chamar_funcao('backup-diario', '{"acao":"exportar"}'::jsonb)$$);

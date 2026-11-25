@@ -155,11 +155,11 @@ export default async function (t) {
   ok(!/aguardando confirmação do Meta/.test(await page.textContent('#view')), 'busca seguinte confirmou: marca "aguardando" some');
   ok(await voo(a => window.AOS_VOO.statusCampanhas('9000000000000105') && window.AOS_VOO.modelo('9000000000000105').camps.some(c => c.sets.some(s => s.ads.some(x => x.id === a && x.st === 'PAUSED'))), ad), 'anúncio aparece pausado depois da confirmação');
 
-  step('Painel de Voo: orçamento com teto do cliente e limite de 4 por hora');
+  step('Painel de Voo: orçamento com teto do cliente e limite de 10 por hora');
   await abrirConta('9000000000000106', 'campanhas');
   await page.$$eval('details.lv-s', l => l.forEach(d => { d.open = true; })); await page.waitForTimeout(100);
   const orcId = await page.$eval('[data-voo-orc]', b => b.dataset.vooOrc);
-  for (let k = 1; k <= 4; k++) {
+  for (let k = 1; k <= 10; k++) {
     await page.click(`[data-voo-orc="${orcId}"]`); await page.waitForSelector('.ov-modal [name="valor"]');
     await page.fill('.ov-modal [name="valor"]', k === 1 ? '900000' : String(4000 + k * 100));
     if (k === 1) { await page.dispatchEvent('.ov-modal [name="valor"]', 'input'); ok(/Passa do teto do cliente/.test(await page.textContent('.ov-modal')), 'aviso "passa do teto do cliente" antes de confirmar'); ok(/Aumento acima de/.test(await page.textContent('.ov-modal')), 'aviso de aumento grande (aprendizado)'); }
@@ -167,12 +167,12 @@ export default async function (t) {
     await digitarSIM('SIM'); await page.click('.ov-modal [data-ok]'); await page.waitForSelector('.ov-modal', { state: 'detached', timeout: 5000 }); await page.waitForTimeout(700);
     await page.evaluate(() => document.querySelectorAll('.toasts > *, .toast').forEach(x => x.remove()));
   }
-  ok(await voo(() => window.AOS.db.count('clientActions', a => a.origem === 'torre' && a.tipo === 'Orçamento alterado')) === 4, '4 mudanças de orçamento registradas');
+  ok(await voo(() => window.AOS.db.count('clientActions', a => a.origem === 'torre' && a.tipo === 'Orçamento alterado')) === 10, '10 mudanças de orçamento registradas');
   await page.waitForTimeout(300);
   await page.click(`[data-voo-orc="${orcId}"]`); await page.waitForTimeout(400);
-  ok(!(await page.$('.ov-modal [name="valor"]')) && /no máximo 4 mudanças/.test(await page.textContent('#toasts')), '5ª mudança na mesma hora bloqueada');
+  ok(!(await page.$('.ov-modal [name="valor"]')) && /no máximo 10 mudanças/.test(await page.textContent('#toasts')), '11ª mudança na mesma hora bloqueada');
   let lim = null; try { await voo(o => window.AOS_VOO.executarAcao({ acao: 'orcamento', nivel: 'campanha', id: o, conta: '9000000000000106', valor: 777 }), orcId); } catch (e) { lim = String(e.message); }
-  ok(lim && /no máximo 4/.test(lim), 'limite também na camada de envio (não só no botão)');
+  ok(lim && /no máximo 10/.test(lim), 'limite também na camada de envio (não só no botão)');
 
   step('Painel de Voo: pedir criativo e avisar cliente');
   await abrirConta('9000000000000105');

@@ -1,0 +1,73 @@
+# Cópia de segurança FORA do Supabase (docs/BACKUP-E-RESTAURACAO.md, cópia 3).
+# Todo dia baixa o backup lógico mais recente (Edge Function backup-diario, acao "baixar"), CRIPTOGRAFA com
+# AES-256 (openssl, chave derivada da senha BACKUP_PASSPHRASE com PBKDF2 200 mil iterações) e grava só o arquivo
+# criptografado no ramo órfão `backups` deste repositório (mantém os 90 mais recentes). Nunca grava texto aberto.
+# Segredos do repositório (Settings › Secrets and variables › Actions):
+#   SUPABASE_FUNCTIONS_URL  = https://hzonfbqsjxiwfmjywdlw.supabase.co/functions/v1
+#   BACKUP_DOWNLOAD_SECRET  = o mesmo valor gravado nos segredos das Edge Functions do Supabase
+#   BACKUP_PASSPHRASE       = senha da criptografia (guarde num gerenciador de senhas: sem ela o backup não abre)
+name: backup-diario
+on:
+  schedule:
+    - cron: '40 6 * * *'   # 06:40 UTC = 03:40 em São Paulo (30 min depois do backup no Supabase)
+  workflow_dispatch: {}
+permissions:
+  contents: write
+concurrency:
+  group: backup
+  cancel-in-progress: false
+jobs:
+  copiar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Conferir segredos
+        env:
+          URL: ${{ secrets.SUPABASE_FUNCTIONS_URL }}
+          SEG: ${{ secrets.BACKUP_DOWNLOAD_SECRET }}
+          PASS: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          for v in URL SEG PASS; do [ -n "${!v}" ] || { echo "::error::Segredo do repositório ausente ($v). Veja docs/BACKUP-E-RESTAURACAO.md"; exit 1; }; done
+      - name: Baixar e criptografar
+        env:
+          URL: ${{ secrets.SUPABASE_FUNCTIONS_URL }}
+          SEG: ${{ secrets.BACKUP_DOWNLOAD_SECRET }}
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p "$RUNNER_TEMP/bk"
+          curl -sS --fail-with-body -X POST "$URL/backup-diario" -H "x-backup-secret: $SEG" -H 'Content-Type: application/json' \
+            -d '{"acao":"baixar"}' -D "$RUNNER_TEMP/bk/h.txt" -o "$RUNNER_TEMP/bk/b.json.gz"
+          DIA=$(grep -i '^x-backup-dia:' "$RUNNER_TEMP/bk/h.txt" | tr -d '\r' | awk '{print $2}')
+          SHA=$(grep -i '^x-backup-sha256:' "$RUNNER_TEMP/bk/h.txt" | tr -d '\r' | awk '{print $2}')
+          [ -n "$DIA" ] || { echo "::error::resposta sem data"; exit 1; }
+          echo "$SHA  $RUNNER_TEMP/bk/b.json.gz" | sha256sum -c -
+          gunzip -c "$RUNNER_TEMP/bk/b.json.gz" | python3 -c 'import json,sys; d=json.load(sys.stdin); assert d["formato"]=="gmarketing-backup"; print("contagens:", d["contagens"])'
+          openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -md sha256 -pass env:BACKUP_PASSPHRASE \
+            -in "$RUNNER_TEMP/bk/b.json.gz" -out "$RUNNER_TEMP/bk/gmarketing-$DIA.json.gz.enc"
+          # prova de que abre com a senha antes de gravar
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -md sha256 -pass env:BACKUP_PASSPHRASE -in "$RUNNER_TEMP/bk/gmarketing-$DIA.json.gz.enc" | sha256sum | grep -q "$SHA"
+          rm -f "$RUNNER_TEMP/bk/b.json.gz"
+          echo "DIA=$DIA" >> "$GITHUB_ENV"; echo "SHA=$SHA" >> "$GITHUB_ENV"
+      - name: Gravar no ramo backups
+        run: |
+          set -euo pipefail
+          git config --global user.name 'backup-bot'
+          git config --global user.email 'backup-bot@users.noreply.github.com'
+          R="https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+          if git ls-remote --exit-code --heads "$R" backups >/dev/null; then
+            git clone --quiet --depth 1 --branch backups "$R" repo
+          else
+            git init --quiet repo && cd repo && git checkout --quiet --orphan backups && git remote add origin "$R" && cd ..
+          fi
+          cd repo
+          mkdir -p diario
+          cp "$RUNNER_TEMP/bk/gmarketing-$DIA.json.gz.enc" diario/
+          echo "$DIA $SHA" >> diario/SHA256-do-gz.txt
+          ls -1 diario/*.enc | sort | head -n -90 | xargs -r git rm --quiet -f
+          printf '# Backups criptografados (AES-256-CBC, PBKDF2 200000, sha256)\nAbrir: node scripts/restaurar-backup.mjs <arquivo.enc> (ramo main). Ver docs/BACKUP-E-RESTAURACAO.md\n' > README.md
+          git add -A
+          git commit --quiet -m "backup $DIA" || echo "nada novo"
+          git push --quiet origin HEAD:backups
+          rm -rf "$RUNNER_TEMP/bk"
