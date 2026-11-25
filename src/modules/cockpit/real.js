@@ -38,7 +38,7 @@ function kpis(ctx) {
   const meta = padrao('operacao.prazo.meta', 95);
   const K = [
     { rotulo: 'MRR', valor: cli.length ? fmt.brlK(mrr) : '—', comp: cli.length ? fmt.plural(cli.length, 'cliente ativo', 'clientes ativos') : 'cadastre os clientes', href: '#/financeiro/visao', ajuda: 'Receita recorrente mensal: soma do MRR dos clientes ativos no cadastro.', id: 'mrr' },
-    { rotulo: 'MRR em risco', valor: fmt.brlK(mrrRisco), comp: risco.length ? `${fmt.plural(risco.length, 'cliente')}${mrr ? ` · ${fmt.pct((mrrRisco / mrr) * 100, 1)} do MRR` : ''}` : 'nenhum cliente em risco', alerta: risco.length > 0, deltaBom: null, href: '#/clientes?f=risco', ajuda: 'Soma do MRR dos clientes com health score abaixo do limite de risco.', id: 'risco' },
+    { rotulo: 'MRR em risco', valor: cli.length ? fmt.brlK(mrrRisco) : '—', comp: risco.length ? `${fmt.plural(risco.length, 'cliente')}${mrr ? ` · ${fmt.pct((mrrRisco / mrr) * 100, 1)} do MRR` : ''}` : cli.length ? 'nenhum cliente em risco' : 'sem clientes na carteira', alerta: risco.length > 0, deltaBom: null, href: '#/clientes?f=risco', ajuda: 'Soma do MRR dos clientes com health score abaixo do limite de risco.', id: 'risco' },
     { rotulo: 'Margem líquida', valor: d.margem != null ? fmt.pct(d.margem, 1) : '—', comp: d.margem != null ? ctx.periodoInfo.rotulo : 'sem lançamentos no Financeiro', href: '#/financeiro/dre', ajuda: 'Resultado ÷ receita do período, calculado dos lançamentos do Financeiro.', id: 'margem' },
     { rotulo: 'Caixa', valor: temCx ? fmt.brlK(saldo) : '—', delta: temCx && qm ? `${fmt.dec(saldo / qm, 1)} meses` : undefined, deltaBom: null, comp: temCx ? (qm ? 'de runway' : 'saldo dos lançamentos') : 'sem lançamentos no Financeiro', href: '#/financeiro/caixa', ajuda: 'Soma dos lançamentos realizados. Runway = caixa ÷ média de saídas dos últimos 3 meses.', id: 'caixa' },
     { rotulo: 'Clientes ativos', valor: String(cli.length), comp: cli.length ? 'no cadastro' : 'nenhum cadastrado ainda', href: '#/clientes', ajuda: 'Clientes com cadastro ativo.', id: 'clientes' },
@@ -112,10 +112,27 @@ function renovacoes(ctx) {
     corpo: `<ul class="ck-ren">${ren.map(({ c }) => { const dc = fmt.dataCurta(c.renova).split('/'); return `<li><a href="#/clientes/${fmt.esc(c.id)}"><span class="ck-ren-d num"><b>${fmt.esc(dc[0])}</b><span>${fmt.esc(dc[1] || '')}</span></span><span class="ck-ren-n"><b class="trunc">${fmt.esc(c.nome || 'Cliente')}</b><span class="sm mut trunc">${fmt.esc(c.segmento || '')}</span></span><span class="ck-ren-v">${c.mrr ? `<span class="num">R$ ${fmt.dec(c.mrr / 1000, 1)}k</span>` : ''}${typeof c.health === 'number' ? ui.selo(estH(c.health), String(c.health), { title: `Health score ${c.health}` }) : ''}</span></a></li>`; }).join('')}</ul>` });
 }
 
+/** "Primeiros passos": aparece enquanto a base real ainda não tem o essencial para o Cockpit fazer sentido */
+function primeirosPassos(ctx) {
+  const { ui, fmt, db } = ctx;
+  const P = [
+    { ok: db.count('clients') > 0, t: 'Cadastre seus clientes', d: 'MRR, health score e renovação alimentam MRR, risco e o mapa da carteira.', a: 'Cadastrar cliente', href: '#/clientes/novo', perm: ['clientes', 'editar'] },
+    { ok: db.count('cash') > 0 || db.count('invoices') > 0, t: 'Lance receitas e custos', d: 'Lançamentos e faturas geram caixa, margem e o gráfico Receita × Custos.', a: 'Abrir Financeiro', href: '#/financeiro/caixa', perm: ['financeiro', 'ver'] },
+    { ok: db.count('team', t => t.ativo !== false && t.faturavel) > 0, t: 'Monte a equipe', d: 'Marque quem trabalha em clientes para medir ocupação e capacidade.', a: 'Abrir equipe', href: '#/admin/equipe', perm: ['admin', 'ver'] },
+    { ok: db.count('routines') > 0, t: 'Ligue as rotinas', d: 'Sincronizações e relatórios automáticos aparecem na Torre de Controle.', a: 'Abrir Torre', href: '#/torre', perm: ['torre', 'ver'] },
+  ];
+  const feitos = P.filter(p => p.ok).length;
+  if (feitos === P.length) return '';
+  const prox = P.findIndex(p => !p.ok);
+  return `<section class="card ck-passos" aria-labelledby="ck-passos-t"><header class="ck-ps-h"><div><h2 id="ck-passos-t">Primeiros passos</h2><p class="mut sm">Seu Cockpit é montado com os dados reais da agência. Complete estes passos para os indicadores ganharem vida.</p></div>
+<div class="ck-ps-pr"><span class="num"><b>${feitos}</b> de ${P.length}</span>${ui.barra((feitos / P.length) * 100, { rotulo: false, fina: true, faixas: [{ ate: Infinity, estado: 'ok' }], aria: `${feitos} de ${P.length} passos concluídos` })}</div></header>
+<ol class="ck-ps">${P.map((p, i) => { const pode = ctx.can(p.perm[0], p.perm[1]); return `<li class="${p.ok ? 'ok' : i === prox ? 'prox' : ''}"><span class="ck-ps-n" aria-hidden="true">${p.ok ? ui.ic('check') : i + 1}</span><div class="ck-ps-m"><b>${fmt.esc(p.t)}</b><span>${fmt.esc(p.d)}</span>${p.ok ? '<span class="ck-ps-f">Concluído</span>' : pode ? ui.btn({ rotulo: p.a, href: p.href, sm: true, tipo: i === prox ? 'pri' : '', iconeDir: 'arrow-right' }) : ''}</div></li>`; }).join('')}</ol></section>`;
+}
+
 /** página inteira (produção). `head` e `precisa` vêm do index (mesma marcação do demo). */
 export function renderReal(ctx, head, precisa) {
   const rc = FIN.receitaCustosCard(ctx, { altura: 286, acoes: ctx.ui.btn({ rotulo: 'DRE', href: '#/financeiro/dre', sm: true, tipo: 'ghost', iconeDir: 'arrow-right' }), acao: ctx.can('financeiro', 'ver') ? undefined : false });
-  return `<div class="pg m-cockpit">${head}${kpis(ctx)}
+  return `<div class="pg m-cockpit ck-real">${head}${primeirosPassos(ctx)}${kpis(ctx)}
 <div class="ck-r1">${precisa}${saude(ctx)}</div>
 <div class="g-2-1">${rc}${torre(ctx)}</div>
 <div class="g-2-1">${mapa(ctx)}<div class="stack ck-st">${capacidade(ctx)}${renovacoes(ctx)}</div></div></div>`;

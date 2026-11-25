@@ -45,7 +45,7 @@ function render(ctx) {
   // produção: abas calculadas das coleções reais (Receber e pagar, Comissões e Automação já leem só dados reais)
   const corpo = (demo ? { visao, caixa, dre: dreAba, receber, rentabilidade, unidade, comissoes: abaComissoes, automacao: LEM.abaAutomacao }
     : { visao: REAL.visao, caixa: (c, p) => REAL.caixa(c, p, tabelaLancamentos(c, p)), dre: REAL.dreAba, receber, rentabilidade: REAL.rentabilidade, unidade: REAL.unidade, comissoes: abaComissoes, automacao: LEM.abaAutomacao })[aba](ctx, pode);
-  return `<div class="pg m-financeiro">${head}${ui.tabs(ABAS, aba, 'financeiro')}${corpo}</div>`;
+  return `<div class="pg m-financeiro${demo ? '' : ' mf-real'}">${head}${ui.tabs(ABAS, aba, 'financeiro')}${corpo}</div>`;
 }
 
 /* ---------- Visão geral ---------- */

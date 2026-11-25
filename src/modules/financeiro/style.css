@@ -85,3 +85,14 @@
 .m-financeiro .mf-pes .av{flex:none}
 .m-financeiro .mf-nw{white-space:nowrap}
 .m-financeiro .mf-ledm{display:inline-flex;margin-right:8px;vertical-align:1px}
+
+/* produção (dados reais): estados vazios emoldurados, grades alinhadas pelo topo */
+@media (min-width:1280px){.m-financeiro .mf-kpis.mf-k4{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.m-financeiro.mf-real .g-2-1,.m-financeiro.mf-real .g2{align-items:start}
+.m-financeiro.mf-real .card .vz{border:1px dashed var(--line-2);border-radius:var(--r-sm);background:var(--card-2);padding:28px 20px 26px;gap:6px}
+.m-financeiro.mf-real .card .vz-i{background:var(--card);box-shadow:0 0 0 1px var(--line)}
+.m-financeiro.mf-real .card .vz p{font-size:13px}
+.m-financeiro.mf-real .card .vz .btn.pri{height:30px;padding:0 12px;font-size:12.5px;background:var(--card);border-color:var(--line-2);color:var(--fg);box-shadow:0 1px 2px rgba(15,23,42,.06)}
+.m-financeiro.mf-real .card .vz .btn.pri:hover{background:var(--card-3)}
+.m-financeiro.mf-real .card .vz .btn.pri .ic{color:var(--acc)}
+.m-financeiro.mf-real .mf-vz-g .vz{padding:44px 24px 40px}

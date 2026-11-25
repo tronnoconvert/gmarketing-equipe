@@ -125,6 +125,7 @@ ${ui.kpi({ rotulo: 'MRR', valor: nCli ? F.brlK(mrr) : '—', comp: nCli ? F.plur
 ${ui.kpi({ rotulo: 'Receita líquida', valor: d.n ? F.brlK(d.receitaLiquida * 1000) : '—', comp: d.n ? ctx.periodoInfo.rotulo : semLanc, ajuda: 'Entradas realizadas no período menos impostos lançados (categoria Impostos).' })}
 ${ui.kpi({ rotulo: 'Margem líquida', valor: d.margem != null ? F.pct(d.margem, 1) : '—', comp: d.margem != null ? ctx.periodoInfo.rotulo : semLanc, href: '#/financeiro/dre', ajuda: 'Resultado ÷ receita do período, calculado dos lançamentos. Detalhe na aba DRE.' })}
 ${ui.kpi({ rotulo: 'Caixa', valor: temCx ? F.brlK(saldo) : '—', delta: temCx && qm ? `${F.dec(saldo / qm, 1)} meses` : undefined, deltaBom: null, comp: temCx ? (qm ? 'de runway' : 'saldo dos lançamentos') : 'nenhum lançamento ainda', href: '#/financeiro/caixa', ajuda: 'Soma dos lançamentos realizados (entradas − saídas). Runway = caixa ÷ média de saídas dos últimos 3 meses.' })}
+${ui.kpi({ rotulo: 'A receber', valor: F.brlK(abertas().reduce((a, f) => a + (Number(f.valor) || 0), 0)), delta: F.plural(abertas().length, 'fatura'), deltaBom: null, comp: 'em aberto', href: '#/financeiro/receber', ajuda: 'Soma das faturas emitidas e ainda não pagas.' })}
 ${ui.kpi({ rotulo: 'Em atraso', valor: F.brlK(vencV), delta: F.plural(venc.length, 'fatura'), deltaBom: null, comp: crit ? `${crit} há mais de ${AC} dias` : `nenhuma há mais de ${AC} dias`, alerta: crit > 0, href: '#/financeiro/receber?f=vencidas', ajuda: `Soma das faturas em aberto depois do vencimento. Fica vermelho quando alguma passa de ${AC} dias.` })}
 </div>`;
   // ponte de MRR: só com movimentos registrados no período
@@ -147,10 +148,9 @@ ${ui.kpi({ rotulo: 'Em atraso', valor: F.brlK(vencV), delta: F.plural(venc.lengt
     ? ui.card({ titulo: 'Concentração de receita', ajuda: `Participação dos 3 maiores clientes no MRR. Acima de ${LC}% a agência fica vulnerável à saída de um deles.`, acoes: ui.led(c.share > LC ? 'err' : 'ok', c.share > LC ? 'Concentrada' : 'Saudável'), corpo: `<div class="mf-conc"><b class="num">${F.pct(c.share, 1)}</b><span class="mut sm">do MRR está nos ${Math.min(3, c.lst.length)} maiores clientes (limite ${LC}%)</span></div>${ui.barra(c.share, { faixas: [{ ate: LC, estado: 'ok' }, { ate: Infinity, estado: 'err' }], rotulo: false })}` })
     : vazioCard(ui, 'Concentração de receita', { icone: 'building', titulo: 'Poucos clientes com MRR', texto: 'Cadastre os clientes com a mensalidade (MRR) para medir quanto a receita depende dos maiores.', acao: { rotulo: 'Cadastrar cliente', href: '#/clientes/novo', icone: 'plus' } });
   return `${kpis}
-<div class="g-2-1">${receitaCustosCard(ctx, { acao: btnLanc(ui, pode) || { rotulo: 'Abrir Fluxo de caixa', href: '#/financeiro/caixa', icone: 'arrow-right' } })}
+<div class="g-2-1"><div class="stack">${receitaCustosCard(ctx, { acao: btnLanc(ui, pode) || { rotulo: 'Abrir Fluxo de caixa', href: '#/financeiro/caixa', icone: 'arrow-right' } })}${ponte}</div>
 <div class="stack">${ui.card({ titulo: 'Contas a receber', sub: `${F.brl(totAb)} em aberto`, acoes: ui.btn({ rotulo: 'Ver faturas', href: '#/financeiro/receber', sm: true, tipo: 'ghost', iconeDir: 'arrow-right' }), corpo: agingMini })}
-${conc}</div></div>
-${ponte}`;
+${conc}</div></div>`;
 }
 
 export function caixa(ctx, pode, tabelaLanc) {
@@ -161,7 +161,7 @@ export function caixa(ctx, pode, tabelaLanc) {
   const temProj = entT > 0 || saiT > 0;
   const minimo = Math.min(...pj.map(w => w.saldo)), semanaMin = pj.find(w => w.saldo === minimo);
   const rw = qm ? saldo / qm : null;
-  const kpis = `<div class="g-kpi mf-kpis mf-caixa-k">
+  const kpis = `<div class="g-kpi mf-kpis mf-k4">
 ${ui.kpi({ rotulo: 'Saldo em caixa', valor: temCx ? F.brlK(saldo) : '—', comp: temCx ? 'lançamentos realizados' : 'nenhum lançamento ainda', ajuda: 'Entradas − saídas realizadas (lançamentos, faturas pagas e contas pagas).' })}
 ${ui.kpi({ rotulo: 'Runway', valor: rw != null ? `${F.dec(rw, 1)} meses` : '—', comp: rw != null ? 'caixa ÷ saídas médias' : 'precisa de saídas lançadas', led: rw == null ? undefined : rw < RW ? 'err' : rw < padrao('financeiro.runway.conforto', 6) ? 'warn' : 'ok', ajuda: `Caixa ÷ média mensal de saídas dos últimos 3 meses. Alerta abaixo de ${F.dec(RW, RW % 1 ? 1 : 0)} meses.` })}
 ${ui.kpi({ rotulo: 'Entradas em 90 dias', valor: F.brlK(entT), comp: 'faturas a vencer + previstos', ajuda: 'Faturas em aberto que vencem nas próximas 13 semanas e receitas lançadas como previstas.' })}
@@ -222,7 +222,10 @@ ${ui.card({ titulo: 'Concentração de receita', sub: c.share != null ? `Top 3 =
 
 export function unidade(ctx) {
   const { ui, fmt: F } = ctx;
-  const n = clientesAtivos().length, mrr = mrrReal();
-  const kpis = n ? `<div class="g-kpi mf-ue">${ui.kpi({ rotulo: 'Ticket médio', valor: F.brl(mrr / n), comp: `MRR ÷ ${F.plural(n, 'cliente ativo', 'clientes ativos')}`, ajuda: 'Soma do MRR dos clientes ativos dividida pelo número de clientes ativos.' })}</div>` : '';
+  const n = clientesAtivos().length, mrr = mrrReal(); const sem = 'precisa de dados de aquisição';
+  const kpis = `<div class="g-kpi mf-ue">${ui.kpi({ rotulo: 'Ticket médio', valor: n ? F.brl(mrr / n) : '—', comp: n ? `MRR ÷ ${F.plural(n, 'cliente ativo', 'clientes ativos')}` : 'nenhum cliente ativo', ajuda: 'Soma do MRR dos clientes ativos dividida pelo número de clientes ativos.' })}
+${ui.kpi({ rotulo: 'CAC', valor: '—', comp: sem, ajuda: 'Custo de aquisição: investimento em mídia própria, comercial e marketing ÷ clientes novos no período.' })}
+${ui.kpi({ rotulo: 'LTV', valor: '—', comp: sem, ajuda: 'Valor do cliente ao longo da vida: ticket médio × margem de contribuição × permanência média.' })}
+${ui.kpi({ rotulo: 'Payback do CAC', valor: '—', comp: sem, ajuda: 'Meses de margem para recuperar o CAC.' })}</div>`;
   return `${kpis}${vazioCard(ui, 'CAC, LTV e payback', { icone: 'target', titulo: 'Sem dados de aquisição ainda', texto: 'CAC, LTV e payback precisam do investimento em aquisição (mídia própria, comercial e marketing) e do histórico de clientes ganhos e encerrados. Lance as despesas de marketing no Financeiro e registre as oportunidades ganhas no Comercial.', acao: { rotulo: 'Abrir Comercial', href: '#/comercial', icone: 'arrow-right' } }, { cls: 'mf-vz-g' })}`;
 }
