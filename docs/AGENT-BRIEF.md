@@ -22,7 +22,7 @@ e o código de src/core/ui-demo.js (exemplos de uso de todos os componentes e gr
 - clientes: `#/clientes` (`?f=risco|atraso|inadimplentes|renovam`), `#/clientes/novo`, `#/clientes/:id`, `#/clientes/:id/:aba` (visao, resultados-acoes, entregas, cadastro, financeiro — as antigas resultados, acoes, saude e comentarios redirecionam) · ações: `#/clientes/c-orion?acao=resgate`, `#/clientes/c-technova?acao=agendar`
 - operacao: `#/operacao`, `#/operacao/:aba` (visao, quadro, calendario, projetos) · `#/operacao/quadro?tarefa=<id>`
 - equipe: `#/equipe`, `#/equipe/atividade`, (`#/equipe/acessos` → redireciona para `#/admin/permissoes`), `#/equipe/:id`, `#/equipe/:id/:aba` (agora, performance, evolucao, clientes, horas, acesso) · ação: `#/equipe/t-ana?acao=redistribuir`
-- torre: `#/torre` (rotinas e integrações), `#/torre/rotina/:id` (log), `#/torre/voo` (Painel de Voo — iframe, já existe no placeholder: preserve) · ação: `#/torre/rotina/r-sync-leads`
+- torre: `#/torre` (rotinas e integrações), `#/torre/rotina/:id` (log), `#/torre/voo` (Painel de Voo nativo), `#/torre/voo/:conta?aba=campanhas|historico` · ação: `#/torre/rotina/r-sync-leads`
 - comercial: `#/comercial`, `#/comercial/:aba` (pipeline, desempenho, propostas)
 - alertas: `#/alertas`, `#/alertas/regras`
 - webinars: `#/webinars`, `#/webinars/novo`, `#/webinars/:id`, `#/webinars/:id/preencher`

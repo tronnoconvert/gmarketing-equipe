@@ -12,7 +12,8 @@
 import { db } from '../../core/store.js';
 import { padrao } from '../../core/padroes/index.js';
 
-export const HOJE = '2026-11-24';
+// "hoje" da carteira: data fixa do documento no modo demonstração; produção usa o dia real
+export const HOJE = db.dadosDemo ? '2026-11-24' : (d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`)(new Date());
 const DIA = 864e5;
 const d0 = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
 const isoD = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;

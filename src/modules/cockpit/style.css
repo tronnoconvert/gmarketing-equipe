@@ -76,3 +76,4 @@
 .m-cockpit .ck-kpis .kpi-v{font-size:21px}
 @media (min-width:1500px){.m-cockpit .ck-kpis .kpi-v{font-size:24px}}
 .m-cockpit .card.np{display:block;max-height:none}
+.m-cockpit .ck-hoje.ck-ok{box-shadow:var(--sh)}

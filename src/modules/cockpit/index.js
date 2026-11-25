@@ -58,11 +58,13 @@ function render(ctx) {
 <span class="ck-it-a">${ui.btn({ rotulo: it.acao, href: it.href, sm: true, tipo: it.estado === 'err' ? 'pri' : '', attrs: { 'data-acao': it.k } })}${ui.btnIc('check', pode ? 'Marcar como resolvido' : SEM_EDICAO, { 'data-resolver': it.k, disabled: !pode })}</span></li>`;
   const feitosHtml = feitos.length ? `<details class="ck-feitos"${ctx.query.resolvidos ? ' open' : ''}><summary>${ui.ic('check-circle')}<span>${fmt.plural(feitos.length, 'item resolvido', 'itens resolvidos')}</span></summary><ul class="ck-fl">${feitos.map(it => `<li>${ui.led('ok', false)}<span class="trunc"><s>${fmt.esc(it.titulo)}</s> <span class="mut sm">· ${fmt.esc(it.auto || `resolvido por ${it.resolvido.por || '—'} ${fmt.rel(it.resolvido.em)}`)}</span></span>${it.auto ? '' : ui.btn({ rotulo: 'Desfazer', sm: true, tipo: 'link', disabled: !pode, attrs: { 'data-reabrir': it.k } })}</li>`).join('')}</ul></details>` : '';
   const precisa = ui.card({
-    titulo: 'Precisa de você hoje', id: 'ck-hoje', cls: 'ck-hoje', sub: pend.length ? fmt.plural(pend.length, 'item', 'itens') : 'tudo resolvido',
+    titulo: 'Precisa de você hoje', id: 'ck-hoje', cls: `ck-hoje${pend.length ? '' : ' ck-ok'}`, sub: pend.length ? fmt.plural(pend.length, 'item', 'itens') : 'tudo resolvido',
     ajuda: 'Itens que dependem de uma decisão sua, do mais crítico para o menos. Use a ação para resolver na hora ou marque como resolvido (✓) — dá para desfazer.',
     acoes: ui.btn({ rotulo: 'Alertas', href: '#/alertas', sm: true, tipo: 'ghost', iconeDir: 'arrow-right' }),
     corpo: `${pend.length ? `<ul class="lst ck-lst">${pend.map(linha).join('')}</ul>` : ui.vazio({ icone: 'check-circle', titulo: 'Tudo em ordem por hoje', texto: 'Quando algo precisar de você — cliente em risco, rotina falhando, fatura vencida — aparece aqui.', compacto: true })}${feitosHtml}`,
   });
+  // produção: o resto da página sai das coleções reais (cockpit/real.js); o snapshot abaixo é só do modo demonstração
+  if (!db.dadosDemo) return renderReal(ctx, head, precisa);
 
   /* Saúde da agência */
   const saude = ui.card({
@@ -144,7 +146,7 @@ function mount(el, ctx) {
   const onClick = e => {
     const r = e.target.closest('[data-resolver]');
     if (r && !r.disabled) {
-      const k = r.dataset.resolver; const it = ITENS.find(x => x.k === k);
+      const k = r.dataset.resolver; const it = itensHoje(ctx).find(x => x.k === k) || { titulo: k };
       const itens = resolvidos(db); const antes = { ...itens };
       itens[k] = { em: new Date().toISOString(), por: ctx.user.nome };
       salvarResolvidos(db, itens, `marcou como resolvido no Cockpit: ${it.titulo}`);
@@ -153,7 +155,7 @@ function mount(el, ctx) {
     }
     const d = e.target.closest('[data-reabrir]');
     if (d && !d.disabled) {
-      const k = d.dataset.reabrir; const it = ITENS.find(x => x.k === k);
+      const k = d.dataset.reabrir; const it = itensHoje(ctx).find(x => x.k === k) || { titulo: k };
       const itens = resolvidos(db); const antes = { ...itens }; delete itens[k];
       salvarResolvidos(db, itens, `reabriu no Cockpit: ${it.titulo}`);
       ui.toast(`"${it.titulo}" voltou para a lista.`, { tipo: 'info', desfazer: () => salvarResolvidos(db, antes, `marcou como resolvido no Cockpit: ${it.titulo}`) });
@@ -165,6 +167,6 @@ function mount(el, ctx) {
 
 export default {
   id: 'cockpit', titulo: 'Cockpit', icone: 'gauge', grupo: 'visao', rota: 'cockpit', routes: ['cockpit'],
-  watch: ['finance', 'invoices', 'clients', 'routines', 'teamStats', 'team'],
+  watch: ['finance', 'invoices', 'clients', 'routines', 'teamStats', 'team', 'alerts', 'cash', 'deliveries'],
   render, mount,
 };

@@ -10,6 +10,13 @@ import MotorRecs from '../../shared/motor-recs.mjs';
 import Guardiao from '../../shared/guardiao.mjs';
 
 const esc = fmt.esc;
+/** produção: links do catálogo que apontam para registros de exemplo (c-orion, t-ana, r-health…) inexistentes voltam para a seção */
+const COL_LINK = { clientes: 'clients', equipe: 'team', 'torre/rotina': 'routines' };
+function linkReal(l) {
+  if (!l || db.dadosDemo) return l;
+  const m = /^#\/(clientes|equipe|torre\/rotina)\/([a-z]-[\w-]+)/.exec(l);
+  return m && !db.get(COL_LINK[m[1]], m[2]) ? `#/${m[1] === 'torre/rotina' ? 'torre' : m[1]}` : l;
+}
 const HIST = 'padroesHistorico';
 export const SECOES = [
   { id: 'clientes', rotulo: 'Clientes', icone: 'building', lado: 'gestao', desc: 'Health score, risco de cancelamento, renovação e onboarding.' },
@@ -173,7 +180,8 @@ function linhaEntrada(ctx, p, pode) {
   const estado = motor
     ? (alt ? ui.selo('warn', 'Ajustado') : ui.selo('off', 'Padrão'))
     : sujo ? ui.selo('acc', 'Não salvo') : alt ? ui.selo('warn', 'Alterado') : editavel(p) ? ui.selo('off', 'Padrão') : ui.selo('off', 'Fixo');
-  const onde = (p.ondeUsa || []).map(o => p.link ? `<a class="m-padroes-chip" href="${esc(p.link)}">${esc(o)}</a>` : `<span class="m-padroes-chip">${esc(o)}</span>`).join('');
+  const lk = linkReal(p.link);
+  const onde = (p.ondeUsa || []).map(o => lk ? `<a class="m-padroes-chip" href="${esc(lk)}">${esc(o)}</a>` : `<span class="m-padroes-chip">${esc(o)}</span>`).join('');
   const restaurarBtn = pode && alt && !motor && editavel(p) ? ui.btn({ rotulo: 'Restaurar padrão', icone: 'refresh', sm: true, tipo: 'ghost', attrs: { 'data-pd-restaurar': p.id } }) : '';
   const histHtml = h.length ? `<details class="m-padroes-hist"><summary>${ui.ic('clock')} Histórico (${h.length})</summary><ol>${h.slice(0, 12).map(x => `<li><span class="num">${esc(fmt.dataHora(x.quando))}</span><b>${esc(nomeQuem(x.quem))}</b><span>${x.item ? `${esc(x.item)}: ` : ''}${esc(histTxt(x, p))}</span></li>`).join('')}</ol></details>` : '';
   const motorHtml = motor ? editorMotor(ctx, p, pode) : '';

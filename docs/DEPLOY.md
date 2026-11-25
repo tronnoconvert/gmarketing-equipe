@@ -18,7 +18,7 @@ Já está pronto no Supabase **gmarketing-equipe** (ref `hzonfbqsjxiwfmjywdlw`, 
 | Banco (`schema.sql` + `policies.sql`) | ✅ aplicado, org `gmarketing`, matriz de permissões padrão. **Sem dados** (nenhum usuário, nenhum registro). |
 | Receita protegida no banco | ✅ quem não tem a permissão **receita** (padrão: só Dono e Admin) não recebe MRR, faturamento, ticket, valores de contrato, comissões alheias, faturas/caixa/DRE — nem pela tela, nem pela rede, nem pelo realtime (seção 7). |
 | Login sem e-mail | ✅ senha provisória criada pelo admin + troca obrigatória no 1º acesso (seção 2.5). |
-| Edge Functions | ✅ publicadas: `admin-invite`, `notify`, `routines-runner`, `windsor-proxy`, `monday-sync`, `guardiao` (todas ativas; sem chave de provedor respondem "não configurado"). |
+| Edge Functions | ✅ publicadas: `admin-invite`, `notify`, `routines-runner`, `windsor-proxy`, `monday-sync`, `guardiao`, `voo-dados`, `voo-acao` (todas ativas; sem chave de provedor respondem "não configurado"). |
 | Segredos gerados | ✅ `CRON_SECRET`, `BOOTSTRAP_SECRET`, `DEFAULT_ORG_ID=gmarketing` (Edge Functions › Secrets). |
 | `public/config.js` | ✅ preenchido com a URL e a anon key (públicas), `orgId: 'gmarketing'`, `seedDemo: false`. |
 | Agendamentos (pg_cron) | ⏸ infraestrutura pronta (Vault + `aos_chamar_funcao`), **nenhum job ligado** — ver 2.8. |
@@ -75,7 +75,7 @@ No computador (com Node.js instalado), na pasta do projeto:
 npm install -g supabase
 supabase login
 supabase link --project-ref abcd1234          # o código que aparece na URL do projeto
-supabase functions deploy admin-invite windsor-proxy monday-sync notify routines-runner guardiao
+supabase functions deploy admin-invite windsor-proxy monday-sync notify routines-runner guardiao voo-dados voo-acao
 ```
 
 ### 2.4 Guardar as chaves no servidor (segredos)
@@ -166,7 +166,7 @@ O app carrega a biblioteca do Supabase de `cdn.jsdelivr.net` (supabase-js 2.45.4
 arquivo para a hospedagem e aponte `supabaseEsm` em `config.js`.
 
 * **Hostinger (escolha do dono):** hPanel › Gerenciador de arquivos › `public_html` (ou a pasta do subdomínio, ex.:
-  `painel.seudominio.com.br`) › envie o **conteúdo** de `dist/` (index.html, app.js, app.css, config.js, torre/).
+  `painel.seudominio.com.br`) › envie o **conteúdo** de `dist/` (index.html, app.js, app.css, config.js).
 * **Netlify:** app.netlify.com › Add new site › Deploy manually › arraste a pasta `dist/`.
 * **Render:** New › Static Site › conecte o repositório › Build command `npm install && npm run build` › Publish directory `dist`.
 * **Vercel:** New Project › importe o repositório › Build command `npm run build` › Output directory `dist`.
@@ -272,3 +272,65 @@ Como funciona: o app lê pela função `ler_records`/`ler_record` e grava por `g
 (`supabase/policies.sql`); o SELECT direto na tabela `records` dessas coleções é bloqueado para quem não vê receita; o realtime
 avisa só "o registro X mudou" (`records_feed`) e o app busca de novo pela função segura. Mudar a matriz em Administração ›
 Permissões (ex.: liberar receita para o Financeiro) vale na hora, também no banco.
+
+## 8. Painel de Voo (item 17) — Meta Ads dos clientes com dados reais
+
+Telas: **Torre de Controle › Painel de Voo** (`#/torre/voo`) e o detalhe de cada conta (`#/torre/voo/<id da conta>`).
+Em produção os dados vêm do Meta pela **Windsor.ai** (`WINDSOR_API_KEY`, já gravada); no modo demonstração (testes, arquivo
+único "Protótipo Oficial") os dados são fictícios (`src/modules/torre/voo-demo.js`) — a produção nunca mostra dados de demonstração.
+
+### 8.1 Como os dados chegam (frescor)
+| Onde | De onde | Frescor |
+|---|---|---|
+| Visão geral (todas as contas) | Edge Function `voo-dados` `{acao:'ler'}` → cache no servidor (tabela `voo_cache`) | no máximo **5 min**: se passou, devolve o que tem e atualiza em segundo plano; a tela mostra "atualizado há X min" |
+| Detalhe de um cliente | `voo-dados` `{acao:'conta', conta}` → busca **ao vivo** só daquela conta (hoje + 14 dias, campanha/conjunto/anúncio, status e orçamento) e grava no cache | ao abrir; a cada **2 min** com a aba visível; botão "Atualizar agora" (mínimo de **20 s** entre buscas da mesma conta pela mesma pessoa, conferido no servidor) |
+| Depois de pausar/mudar orçamento | o app busca a conta ao vivo de novo | o valor aplicado aparece com "aplicado — aguardando confirmação do Meta" até a leitura confirmar |
+
+- A Windsor guarda uma cópia dos dados do Meta e a própria API do Meta atrasa alguns minutos o **gasto e os resultados**. Com
+  `META_ACCESS_TOKEN`, o **status e o orçamento** do detalhe vêm direto do Meta (Graph API), em tempo real.
+- Só as **contas ativas** da Windsor aparecem (decisão do dono). 1ª busca de todas as contas leva até ~2 min; depois é incremental
+  (hoje e ontem; dias antigos 1×/dia). Alcance/frequência da semana são estimados (a Windsor manda alcance por dia).
+- Quem vê o quê (no servidor): Dono, Admin e Head de Tráfego veem **todas** as contas, inclusive as sem cliente; gestor de tráfego vê só
+  as contas ligadas aos **clientes dele**. Faturamento/ROAS (`action_values_purchase`) só para quem tem a permissão **receita**.
+
+### 8.2 Ligar cada conta ao cliente
+Clientes › (cliente) › Cadastro › Editar › **Metas**: "Contas de anúncios (Meta)" (`act_…`, várias separadas por vírgula — só Dono,
+Admin e Head de Tráfego) e "Meta de custo por conversa" (o semáforo compara com ela) — mais o "Teto de mídia por mês" (aviso de verba).
+Atalho: no Painel de Voo, card **"Contas sem cliente vinculado"** › escolha o cliente › **Vincular**.
+
+### 8.3 Ações no Meta (pausar e orçamento) — token do usuário do sistema (`META_ACCESS_TOKEN`)
+Sem o token o painel funciona só para leitura e mostra "Ações no Meta aguardando o token do usuário do sistema — peça ao administrador".
+Passo a passo (feito uma vez pelo dono, no computador, logado no Facebook que administra o Business Manager da agência):
+1. Abra **https://business.facebook.com/settings** e escolha o Business Manager da agência (canto superior esquerdo).
+2. Menu da esquerda › **Usuários** › **Usuários do sistema** › botão **Adicionar**.
+3. Nome: `Agencia OS Painel de Voo` · Função: **Administrador** › **Criar usuário do sistema**.
+4. Com o usuário selecionado › **Atribuir ativos** › **Contas de anúncios** › marque **todas as contas dos clientes** › ative
+   **Gerenciar contas de anúncios (controle total)** › **Salvar alterações**. (Contas que estão em outro BM: peça ao cliente para
+   compartilhar a conta com o BM da agência como parceiro antes.)
+5. Ainda no usuário › **Gerar novo token** › App: escolha o app da agência (se não houver, crie em https://developers.facebook.com/apps ›
+   **Criar app** › tipo **Empresa** › vincule ao mesmo Business Manager e volte a este passo) › Validade: **Nunca** ›
+   Permissões: marque **ads_management**, **ads_read** e **business_management** › **Gerar token** › **Copiar**.
+   (O token aparece uma vez só. Não mande por WhatsApp nem e-mail.)
+6. Abra **https://supabase.com/dashboard/project/hzonfbqsjxiwfmjywdlw/functions/secrets** › **Add new secret** ›
+   Name: `META_ACCESS_TOKEN` › Value: cole o token › **Save**. (O Guardião usa o mesmo token: se quiser, grave também como
+   `META_SYSTEM_USER_TOKEN`; o painel aceita qualquer um dos dois.)
+7. Pronto: em até 1 minuto os botões **Pausar** e **Orçamento** do Painel de Voo ficam ativos. Teste pausando um anúncio de teste
+   (digite **SIM**).
+
+Regras que valem no servidor (`voo-acao`), não só na tela: **SIM** obrigatório em toda alteração; só **pausar** e **orçamento diário**
+(reativar, arquivar e excluir não existem pelo painel; "Criar ou subir campanha: somente pelo Gerenciador, via 4G."); no máximo
+**4 mudanças de orçamento por conjunto (ou campanha CBO) por hora** (tabela `voo_mudancas`, função `voo_reservar_mudanca`);
+só contas do escopo da pessoa e o item precisa ser da conta (conferido no Meta); "ver como" recusado; conta em quarentena do Guardião
+recusada; tudo registrado em Administração › Auditoria e em Clientes › Resultados e ações. A única alteração sem SIM continua sendo a
+pausa automática do Guardião (invasão).
+
+### 8.4 Agendamento (recomendado)
+Mantém a visão geral fresca mesmo sem ninguém com a tela aberta (SQL Editor; já está no fim de `supabase/cron.sql`):
+```sql
+select cron.schedule('aos-voo-dados', '*/5 * * * *', $$select public.aos_chamar_funcao('voo-dados', '{"acao":"atualizar"}'::jsonb)$$);
+```
+Para desligar: `select cron.unschedule('aos-voo-dados');`.
+
+### 8.5 Teste real
+`SQL_CMD=/caminho/q.sh node tests/live/voo.mjs` cria 2 logins e 1 cliente de teste, confere escopo, receita, busca ao vivo, regras das
+ações e o limite por hora, e apaga tudo no final (25/11/2026: 23/23).

@@ -116,7 +116,7 @@ function conteudoGeral(ctx, mod, g) {
 ${ui.kpi({ rotulo: 'Investimento hoje', valor: fmt.brl(soma('hoje')), comp: `ontem ${fmt.brl(soma('ontem'))}`, ajuda: 'Soma do gasto de hoje (até agora) em todas as contas que você vê. O Meta pode levar alguns minutos para contabilizar.' })}
 ${ui.kpi({ rotulo: 'Investimento 7 dias', valor: fmt.brl(soma('d7')), delta: dl(soma('d7'), soma('d7ant')), deltaBom: null, comp: 'vs 7 dias anteriores', serie: mod.dias.slice(0, 14).map((_, i) => todas.reduce((s, c) => s + c.dias[i].gasto, 0)), formatoSerie: 'brl' })}
 ${ui.kpi({ rotulo: 'Conversas 7 dias', valor: fmt.num(conv7), delta: dl(conv7, conv7a), comp: 'vs 7 dias anteriores', ajuda: 'Conversas iniciadas por mensagem (WhatsApp, Messenger, Direct) nas campanhas de mensagem.' })}
-${ui.kpi({ rotulo: 'Custo por conversa 7d', valor: conv7 ? fmt.brl2(vm7 / conv7) : '—', delta: conv7 && conv7a ? dl(vm7 / conv7, vm7a / conv7a) : undefined, deltaBom: conv7 && conv7a ? vm7 / conv7 <= vm7a / conv7a : null, comp: 'média ponderada' })}
+${ui.kpi({ rotulo: 'Custo/conversa 7d', valor: conv7 ? fmt.brl2(vm7 / conv7) : '—', delta: conv7 && conv7a ? dl(vm7 / conv7, vm7a / conv7a) : undefined, deltaBom: conv7 && conv7a ? vm7 / conv7 <= vm7a / conv7a : null, comp: 'média ponderada' })}
 ${ui.kpi({ rotulo: 'Pedindo ação', valor: String(nAt), alerta: nAt > 0, href: ctx.router.href(null, { f: 'atencao' }), comp: `de ${todas.length} contas`, ajuda: 'Crítico, Caro, Conta parada, pagamento pendente, quarentena ou recomendação "Agora".' })}</div>`;
 
   // fila "Comece por aqui"
@@ -207,9 +207,9 @@ function kpisConta(c) {
   const dl = (a, b) => (b ? `${a >= b ? '▲' : '▼'} ${fmt.dec(Math.abs((a / b - 1) * 100), 1)}%` : undefined);
   const k = [
     ui.kpi({ rotulo: 'Gasto hoje', valor: fmt.brl2(c.m.hoje.gasto), comp: `ontem ${fmt.brl2(c.m.ontem.gasto)}`, ajuda: 'Até agora. O Meta pode levar alguns minutos para contabilizar o gasto.' }),
-    ui.kpi({ rotulo: 'Gasto 7 dias', valor: fmt.brl2(m7.gasto), delta: dl(m7.gasto, a7.gasto), deltaBom: null, comp: 'vs 7 dias anteriores', serie: c.serie.slice(0, 14).map(x => x.gasto), formatoSerie: 'brl' }),
+    ui.kpi({ rotulo: 'Gasto 7 dias', valor: fmt.brl(m7.gasto), delta: dl(m7.gasto, a7.gasto), deltaBom: null, comp: 'vs 7 dias anteriores', serie: c.serie.slice(0, 14).map(x => x.gasto), formatoSerie: 'brl' }),
     ui.kpi({ rotulo: 'Conversas 7 dias', valor: fmt.num(ms.conv), delta: dl(ms.conv, ma.conv), comp: 'vs 7 dias anteriores', serie: c.serie.slice(0, 14).map(x => x.conv) }),
-    ui.kpi({ rotulo: 'Custo por conversa 7d', valor: brlOu(ms.custoConv), delta: ms.custoConv && ma.custoConv ? dl(ms.custoConv, ma.custoConv) : undefined, deltaBom: ms.custoConv && ma.custoConv ? ms.custoConv <= ma.custoConv : null, comp: c.meta ? `meta ${fmt.brl2(c.meta)}` : 'sem meta no cadastro', alerta: !!(c.meta && ms.custoConv && ms.custoConv > c.meta * 1.25) }),
+    ui.kpi({ rotulo: 'Custo/conversa 7d', valor: brlOu(ms.custoConv), delta: ms.custoConv && ma.custoConv ? dl(ms.custoConv, ma.custoConv) : undefined, deltaBom: ms.custoConv && ma.custoConv ? ms.custoConv <= ma.custoConv : null, comp: c.meta ? `meta ${fmt.brl2(c.meta)}` : 'sem meta no cadastro', alerta: !!(c.meta && ms.custoConv && ms.custoConv > c.meta * 1.25) }),
     m7.leads || c.tipo === 'lead' ? ui.kpi({ rotulo: 'Leads 7 dias', valor: fmt.num(m7.leads), comp: m7.cpl ? `${fmt.brl2(m7.cpl)} por lead` : 'formulários e cadastros' }) : ui.kpi({ rotulo: 'Impressões 7 dias', valor: fmt.num(m7.impr), comp: `${fmt.num(m7.link)} cliques no link` }),
     ui.kpi({ rotulo: 'CTR · CPM 7d', valor: m7.ctr != null ? fmt.pct(m7.ctr, 2) : '—', comp: m7.cpm != null ? `CPM ${fmt.brl2(m7.cpm)} · freq. ${m7.freq ? fmt.dec(m7.freq, 1) : '—'}` : '', ajuda: 'CTR = cliques ÷ impressões. CPM = custo por mil impressões. Frequência estimada (o alcance chega por dia; a semana é estimada).' }),
   ];

@@ -43,7 +43,7 @@ export const CLIENTES_IDS = Object.keys(CLIENTES_BASE);
 /** dados do cliente: registro real do db (módulo Clientes) com fallback para os canônicos */
 export function cliente(id) {
   if (!id) return { id: null, nome: 'Interno', interno: true };
-  const c = db.get('clients', id); const b = CLIENTES_BASE[id] || {};
+  const c = db.get('clients', id); const b = (db.dadosDemo && CLIENTES_BASE[id]) || {}; // canônicos só no modo demonstração
   if (!c) return { id, ...b, nome: b.nome || id };
   return { ...b, ...c, nome: c.nome || c.nomeFantasia || b.nome || id, health: c.health ?? c.healthScore ?? b.health, mrr: c.mrr ?? b.mrr, respId: c.respId || b.respId, nps: c.nps ?? b.nps, roas: c.roas ?? b.roas };
 }
@@ -51,7 +51,7 @@ export const nomeCliente = id => cliente(id).nome;
 /** lista de clientes ativos para selects (db se houver, senão canônicos) */
 export function listaClientes() {
   const l = db.list('clients', c => c.ativo !== false && c.status !== 'inativo' && c.status !== 'churn');
-  if (l.length) return l.map(c => cliente(c.id)).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+  if (l.length || !db.dadosDemo) return l.map(c => cliente(c.id)).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
   return CLIENTES_IDS.map(cliente).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
 }
 
@@ -70,7 +70,14 @@ export const TIPOS = {
   reuniao: { rotulo: 'Reunião / CS', skills: ['Atendimento', 'CS', 'Onboarding'] },
 };
 export const rotTipo = t => (TIPOS[t] || { rotulo: t || '—' }).rotulo;
-export const FATURAVEIS = ['t-ana', 't-bruno', 't-felipe', 't-carla', 't-diego', 't-elisa'];
+// pessoas que trabalham em clientes. Demonstração: a equipe de exemplo. Produção: lista VIVA do cadastro (team.faturavel,
+// marcado em Administração › Equipe) — um Proxy relê o db a cada acesso, então .map/.includes/.filter/.length continuam valendo.
+const FAT_DEMO = ['t-ana', 't-bruno', 't-felipe', 't-carla', 't-diego', 't-elisa'];
+const fatReal = () => db.list('team', t => t.ativo !== false && t.faturavel).map(t => t.id);
+export const FATURAVEIS = db.dadosDemo ? FAT_DEMO : new Proxy([], {
+  get(_, k) { const a = fatReal(); const v = a[k]; return typeof v === 'function' ? v.bind(a) : v; },
+  has(_, k) { return k in fatReal(); },
+});
 export const aberta = t => t.status !== 'feito';
 export const atrasada = t => aberta(t) && t.prazo && diasPara(t.prazo) < 0;
 export const venceHoje = t => aberta(t) && t.prazo && diasPara(t.prazo) === 0;

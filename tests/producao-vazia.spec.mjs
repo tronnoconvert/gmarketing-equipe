@@ -8,7 +8,7 @@ export const viewports = [[1366, 900], [390, 844]];
 
 const ROTAS = [
   '#/cockpit', '#/mesa',
-  '#/financeiro', '#/financeiro/visao', '#/financeiro/caixa', '#/financeiro/dre', '#/financeiro/receber', '#/financeiro/rentabilidade', '#/financeiro/unidade',
+  '#/financeiro', '#/financeiro/visao', '#/financeiro/caixa', '#/financeiro/dre', '#/financeiro/receber', '#/financeiro/rentabilidade', '#/financeiro/unidade', '#/financeiro/comissoes', '#/financeiro/automacao',
   '#/clientes', '#/clientes?f=risco', '#/clientes/novo',
   '#/operacao', '#/operacao/visao', '#/operacao/quadro', '#/operacao/calendario', '#/operacao/projetos',
   '#/equipe', '#/equipe/atividade', '#/equipe/t-resp', '#/equipe/t-resp/performance', '#/equipe/t-resp/horas',
@@ -20,7 +20,7 @@ const ROTAS = [
 // textos de snapshots (não estão em coleções): valores do Cockpit/Financeiro/Clientes de demonstração
 const FIXOS = ['186,4', 'R$ 412 mil', '23,9 mil', '27,4%', '6,8 meses', 'Sync de leads', 'Sync leads', 'score caiu 22', '+31 clientes', '98,3', 'R$ 1,98 mi', '543,4', '4.850', '4.438', 'Bella', 'Orion', 'TechNova', 'StudioFit', 'Studio Fit', 'Ana Souza', 'agencia.demo'];
 // nomes de sementes genéricos demais para serem "fictícios" (rótulos legítimos da interface)
-const GENERICOS = new Set(['Torre de Controle', 'Relatório semanal', 'Backup de criativos', 'Meta Ads', 'Google Ads', 'WhatsApp', 'Windsor.ai', 'Supabase', 'monday.com', 'Instagram', 'Google Analytics 4', 'Meta']);
+const GENERICOS = new Set(['Health score dos clientes', 'Torre de Controle', 'Relatório semanal', 'Backup de criativos', 'Meta Ads', 'Google Ads', 'WhatsApp', 'Windsor.ai', 'Supabase', 'monday.com', 'Instagram', 'Google Analytics 4', 'Meta']);
 
 export default async function (t) {
   const { page, ok, step, base } = t;
@@ -94,16 +94,23 @@ export default async function (t) {
 
   step('sino, perfil e paleta');
   await t.ir('#/cockpit');
-  await page.click('#bell'); await page.waitForTimeout(200); await conferir('sino'); await page.keyboard.press('Escape');
-  await page.click('.tb-av'); await page.waitForTimeout(150);
-  ok(!/Modo demonstração/.test(await page.textContent('body')), 'perfil sem "Modo demonstração"'); await page.keyboard.press('Escape');
-  await page.keyboard.press('Control+k'); await page.waitForTimeout(200); await conferir('paleta'); await page.keyboard.press('Escape');
+  await page.click('#bell'); await page.waitForSelector('.ntp'); await page.waitForTimeout(150);
+  const sino = await conferir('sino', '.ntp'); await page.keyboard.press('Escape'); await page.waitForTimeout(150);
+  ok(sino.trim().length > 0, 'painel do sino abriu');
+  await page.click('.tb-av'); await page.waitForSelector('.pm'); await page.waitForTimeout(150);
+  ok(!/Modo demonstração/.test(await page.textContent('.pm')), 'perfil sem "Modo demonstração"'); await page.keyboard.press('Escape'); await page.waitForTimeout(150);
+  await page.evaluate(() => window.AOS.shell.abrirPaleta()); await page.waitForSelector('.ov-cmdk'); await page.waitForTimeout(150);
+  await conferir('paleta', '.ov-cmdk');
+  for (const q of ['or', 'be', 'tec', 'ana', 'sync']) { await page.fill('.ov-cmdk input', q); await page.waitForTimeout(180); await conferir(`paleta "${q}"`, '.ov-cmdk'); }
+  await page.keyboard.press('Escape');
+  step('busca global');
+  if (await page.isVisible('#gs-in')) for (const q of ['orion', 'bella', 'ana']) { await page.evaluate(() => window.AOS.router.go('cockpit')); await page.fill('#gs-in', q); await page.waitForTimeout(250); const r = await page.$('.gs-pop'); if (r) await conferir(`busca "${q}"`, '.gs-pop'); await page.fill('#gs-in', ''); await page.keyboard.press('Escape'); }
 
   if (process.env.SHOTS) {
     step('screenshots');
     for (const tema of ['claro', 'escuro']) {
       await page.evaluate(x => window.AOS.shell.setTema(x), tema); await page.waitForTimeout(150);
-      for (const r of ['cockpit', 'financeiro/visao', 'financeiro/caixa', 'financeiro/dre', 'financeiro/rentabilidade', 'financeiro/unidade', 'clientes', 'operacao', 'equipe', 'torre', 'comercial', 'alertas', 'webinars', 'campanha', 'mesa']) {
+      for (const r of ['cockpit', 'financeiro/visao', 'financeiro/caixa', 'financeiro/dre', 'financeiro/rentabilidade', 'financeiro/unidade', 'clientes', 'operacao', 'equipe', 'torre', 'comercial', 'comercial/desempenho', 'alertas', 'webinars', 'campanha', 'campanha/conexao', 'mesa', 'equipe/t-resp', 'admin/integracoes', 'financeiro/receber', 'notificacoes', 'operacao/quadro', 'clientes/novo']) {
         await t.ir('#/' + r); await page.waitForTimeout(250);
         await page.screenshot({ path: `${process.env.SHOTS}/${r.replace('/', '-')}-${tema}-${t.vp.w}.png`, fullPage: true });
       }

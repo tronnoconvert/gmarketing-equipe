@@ -18,6 +18,8 @@ supabase/
     notify/             envia por WhatsApp/e-mail/Slack as notificações criadas no app
     routines-runner/    avalia as 7 regras de alerta, cria alertas, notifica e registra a execução
     guardiao/           segurança das contas Meta: detecta possível invasão, pausa a conta, quarentena e sirene (a cada 2 min)
+    voo-dados/          Painel de Voo: Meta Ads de todas as contas via Windsor (cache ≤ 5 min; detalhe do cliente ao vivo), escopo e receita
+    voo-acao/           Painel de Voo: pausar e orçamento diário no Meta (SIM, 4 mudanças/conjunto/hora, auditoria) — META_ACCESS_TOKEN
   tests/
     supabase_stub.sql   simula o mínimo do Supabase num Postgres local (só para testes)
     rls_test.sql        92 verificações: RLS, receita (leitura filtrada + merge na gravação), senha provisória, anon, service role
