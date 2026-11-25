@@ -190,7 +190,7 @@ function atualizarChrome() {
   // ver como
   const vc = document.getElementById('vc');
   if (vc) {
-    if (auth.vendoComo()) { const r = auth.real(); vc.hidden = false; vc.innerHTML = `${svgIc('eye')}<span>Vendo como <b>${esc(u.nome)}</b> <span class="vc-p">(${esc(perms.rotuloPapel(u.papel))})</span></span><span class="vc-sep" aria-hidden="true">·</span><button type="button" class="vc-b" data-voltar>Voltar para ${esc(fmt.primeiro(r.nome))}</button>`; document.documentElement.classList.add('vendo-como'); }
+    if (auth.vendoComo()) { const r = auth.real(); vc.hidden = false; vc.innerHTML = `${svgIc('eye')}<span>Vendo como <b>${esc(u.nome)}</b> <span class="vc-p">(${esc(perms.rotuloPapel(u.papel))})</span> · <b class="vc-ro">somente visualização</b></span><span class="vc-sep" aria-hidden="true">·</span><button type="button" class="vc-b" data-voltar>Voltar para ${esc(fmt.primeiro(r.nome))}</button>`; document.documentElement.classList.add('vendo-como'); }
     else { vc.hidden = true; vc.innerHTML = ''; document.documentElement.classList.remove('vendo-como'); }
   }
   document.querySelectorAll('[data-periodo]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.periodo === periodoAtual)));

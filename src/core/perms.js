@@ -83,6 +83,8 @@ export function escopo(mod, user) { return celula(mod, user).escopo; }
  * 'excluir' exige nível 'admin' no módulo, ou papel dono/admin com nível 'editar'.
  */
 export function can(mod, acao = 'ver', user) {
+  // "Ver como" (dono/admin vendo o app de outra pessoa) é só visualização: nenhuma ação além de ver
+  if (user === undefined && acao !== 'ver' && auth.vendoComo && auth.vendoComo()) return false;
   user = user === undefined ? auth.user() : user;
   if (!user) return false;
   const { nivel: n } = celula(mod, user);

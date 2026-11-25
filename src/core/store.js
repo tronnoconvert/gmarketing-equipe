@@ -4,6 +4,14 @@
 export const COLS = ['users', 'team', 'clients', 'contacts', 'contracts', 'services', 'healthHistory', 'deliveries', 'tasks', 'invoices', 'payables', 'cash', 'deals', 'routines', 'routineRuns', 'integrations', 'alerts', 'alertRules', 'notifications', 'comments', 'activity', 'webinars', 'campaignAccount', 'campaignDaily', 'campaigns', 'onboarding', 'meetings', 'timeEntries', 'goals', 'settings', 'clientResults', 'clientActions', 'mrrMoves', 'finance', 'costs', 'projects', 'checkins', 'oneOnOnes', 'teamStats', 'insights', 'webinarDaily', 'creatives', 'invites', 'recsLog', 'relatorios'];
 const KEY = 'aos-db-v1';
 const DB_VERSION = 4; // suba este número quando os dados de exemplo mudarem: o modo demonstração recarrega a semente
+// "Ver como" é só visualização: nenhuma escrita sai do navegador enquanto estiver ativo.
+let leituraFn = () => false, avisoLeitura = null, ultimoAviso = 0;
+function bloqueado(col) {
+  if (!leituraFn()) return false;
+  const gesto = typeof navigator !== 'undefined' && navigator.userActivation && navigator.userActivation.isActive;
+  if (gesto && avisoLeitura && Date.now() - ultimoAviso > 1500) { ultimoAviso = Date.now(); try { avisoLeitura(col); } catch { /* nada */ } }
+  return true;
+}
 const CFG = (typeof window !== 'undefined' && window.AOS_CONFIG) || {};
 const SUPA = !!(CFG.supabaseUrl && CFG.supabaseAnonKey);
 const SUPA_ESM = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm';
@@ -184,6 +192,7 @@ export const db = {
   count(col, pred) { return pred ? this.list(col, pred).length : arr(col).length; },
 
   insert(col, obj, opts = {}) {
+    if (bloqueado(col)) return clone(obj);
     const u = userFn();
     const o = clone(obj) || {};
     if (!o.id) o.id = genId(col);
@@ -196,6 +205,7 @@ export const db = {
     return clone(o);
   },
   update(col, id, patch, opts = {}) {
+    if (bloqueado(col)) return this.get(col, id);
     const a = arr(col); const i = a.findIndex(x => x.id === id);
     if (i < 0) return null;
     const u = userFn();
@@ -207,6 +217,7 @@ export const db = {
   },
   upsert(col, obj, opts = {}) { return obj.id && this.get(col, obj.id) ? this.update(col, obj.id, obj, opts) : this.insert(col, obj, opts); },
   remove(col, id, opts = {}) {
+    if (bloqueado(col)) return null;
     const a = arr(col); const i = a.findIndex(x => x.id === id);
     if (i < 0) return null;
     const [o] = a.splice(i, 1);
@@ -246,6 +257,8 @@ export const db = {
   },
   /** uso interno (auth) */
   _setUserProvider(fn) { userFn = fn; },
+  /** "Ver como": fn() → true enquanto o dono/admin vê o app como outra pessoa (somente visualização) */
+  _setSomenteLeitura(fn, aviso) { leituraFn = fn; avisoLeitura = aviso; },
   /** Supabase: recarrega tudo do servidor (após login, quando o RLS libera as linhas do usuário). */
   async reload() {
     if (!SUPA || !SupabaseAdapter.client) return;

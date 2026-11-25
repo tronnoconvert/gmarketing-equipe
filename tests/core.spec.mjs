@@ -191,6 +191,9 @@ export default async function (t) {
   ok(!mAna.includes('financeiro') && !mAna.includes('cockpit') && mAna.includes('clientes') && mAna.includes('torre'), `menu da Ana (${mAna.join(',')})`);
   await t.ir('#/financeiro');
   ok((await page.textContent('#view')).includes('Você não tem acesso a esta área. Peça ao administrador.'), 'acesso restrito no ver como');
+  ok((await page.textContent('#vc')).includes('somente visualização'), 'banner avisa "somente visualização"');
+  const ro = await page.evaluate(() => { const A = window.AOS; const n0 = A.db.count('tasks'); A.db.insert('tasks', { titulo: 'não deve gravar' }); const c = A.db.list('clients')[0]; A.db.update('clients', c.id, { nome: 'X' }); return { n: A.db.count('tasks') - n0, nome: A.db.get('clients', c.id).nome, pode: A.perms ? A.perms.can('clientes', 'editar') : false }; });
+  ok(ro.n === 0 && ro.nome !== 'X' && !ro.pode, `ver como não grava nem libera edição (${JSON.stringify(ro)})`);
   await page.click('#vc [data-voltar]'); await page.waitForTimeout(200);
   ok(await page.$eval('#vc', e => e.hidden), 'banner some ao voltar');
   ok((await menu()).includes('financeiro'), 'menu do dono de volta');

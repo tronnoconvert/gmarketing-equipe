@@ -12,6 +12,7 @@
   - alterações (pausar, verba, criativo) gravadas em `clientActions`/`activity` e visíveis em Clientes › Resultados e ações;
   - dados reais do Meta via Windsor (Edge Function `windsor-proxy`), confirmação "SIM", limite de 4 mudanças de orçamento/conjunto/hora,
     sem links para o Gerenciador ("Criar ou subir campanha: somente pelo Gerenciador, via 4G.");
+  - "Ver como" (dono/admin vendo outro gestor) = somente visualização: nenhuma ação no Meta (checar auth.vendoComo()).
   - usar o motor único de recomendações (item 18) e o fluxo "Pedir criativo / Avisar cliente".
   - **teto de verba:** usar o teto de mídia do cadastro do cliente (`client.tetoMidiaMensal`, R$/mês) e o diário
     `tetoDiarioCliente(c)` de `src/modules/clientes/calc.js` (mensal ÷ 30,4) para o aviso de teto de orçamento

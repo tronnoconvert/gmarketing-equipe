@@ -260,5 +260,6 @@ export const auth = {
 };
 
 db._setUserProvider(() => auth.real());
+db._setSomenteLeitura(() => auth.vendoComo(), () => toast('Você está vendo como outra pessoa: somente visualização. Nada foi alterado.', { tipo: 'info' }));
 if (CFG.debug) window.AOS_AUTH = auth;
 export default auth;
