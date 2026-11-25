@@ -139,5 +139,5 @@ end $$;
 
 -- ---------------------------------------------------------------- primeira organização
 -- Troque 'minha-agencia' e o nome (o mesmo id vai em public/config.js → orgId).
-insert into public.orgs (id, nome) values ('minha-agencia', 'Minha Agência')
+insert into public.orgs (id, nome) values ('gmarketing', 'Gmarketing')
 on conflict (id) do nothing;

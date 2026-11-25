@@ -97,6 +97,8 @@ insert into public.col_modules (col, mod, escreve, escopo_cliente) values
   ('alerts','alertas',true,false),('alerts','cockpit',false,false),('alertRules','alertas',true,false),('insights','alertas',true,false),('insights','cockpit',false,false),
   -- webinars e campanha
   ('webinars','webinars',true,false),('webinarDaily','webinars',true,false),
+  ('recsLog','campanha',true,false),('recsLog','torre_voo',true,false),
+  ('relatorios','mesa',true,true),('relatorios','torre_voo',false,true),('relatorios','clientes',false,true),
   ('campaignAccount','campanha',true,false),('campaignDaily','campanha',true,false),('campaigns','campanha',true,false),('creatives','campanha',true,false),
   -- administração
   ('users','admin',true,false),('invites','admin',true,false),('team','admin',true,false),('team','equipe',true,false),
