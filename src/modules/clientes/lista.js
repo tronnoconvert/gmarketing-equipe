@@ -67,7 +67,7 @@ ${D ? ui.kpi({ rotulo: 'Churn 12 meses', valor: fmt.pct(CARTEIRA_REF.churn12m), 
       { k: 'respId', l: 'Resp.', v: c => K.nomePessoa(c.respId), r: c => ui.avatar(c.respId, 24) },
     ],
     linhas, onRowHref: c => `#/clientes/${c.id}`, ordem: rec ? { k: 'mrr', dir: 'desc' } : { k: 'health', dir: 'asc' }, legenda: 'Carteira de clientes', id: 'm-clientes-tbl',
-    vazio: { titulo: q ? `Nenhum cliente encontrado para “${query.q}”` : 'Nenhum cliente neste filtro', texto: q ? 'Confira a grafia ou busque pelo CNPJ ou segmento.' : 'Escolha outro filtro acima ou cadastre um cliente.', acao: q ? { rotulo: 'Limpar busca', href: ctx.router.href('clientes', { q: null }) } : null },
+    vazio: !todos.length && !q ? { icone: 'building', titulo: 'Nenhum cliente cadastrado ainda', texto: 'Cadastre o primeiro cliente (ou importe uma planilha) para acompanhar health score, entregas, pagamento e renovação.', acao: podeEditar ? { rotulo: 'Cadastrar cliente', href: '#/clientes/novo', icone: 'plus' } : undefined } : { titulo: q ? `Nenhum cliente encontrado para “${query.q}”` : 'Nenhum cliente neste filtro', texto: q ? 'Confira a grafia ou busque pelo CNPJ ou segmento.' : 'Escolha outro filtro acima ou cadastre um cliente.', acao: q ? { rotulo: 'Limpar busca', href: ctx.router.href('clientes', { q: null }) } : null },
   });
   const carteira = ui.card({
     titulo: 'Carteira', sub: rec ? `${fmt.plural(linhas.length, 'cliente')} · ${fmt.brlK(linhas.reduce((a, c) => a + c.mrr, 0))} de MRR` : `${fmt.plural(linhas.length, 'cliente')} · ordenada pelo health (menor primeiro)`, pad: false, cls: 'm-clientes-cart',
@@ -110,7 +110,7 @@ ${ui.lista(ob.parados.map(o => { const c = db.get('clients', o.clientId) || { no
   const mrrSub = rec ? ` · MRR ${fmt.brlK(k.mrr)}` : ` · ${k.risco.length} em risco`;
   const sub = escopo === 'todos' ? `${fmt.plural(k.n, 'cliente ativo', 'clientes ativos')}${mrrSub}` : `Seus clientes: ${fmt.plural(k.n, 'cliente')}${mrrSub}`;
   return `<div class="pg m-clientes">
-${ui.cabecalho({ titulo: 'Clientes', sub, acoes, meta: `${ui.led('ok', 'Health recalculado')}<span class="mut">${ui.rel(new Date(Date.now() - 35 * 60000).toISOString(), { prefixo: '' })}</span>` })}
+${ui.cabecalho({ titulo: 'Clientes', sub, acoes, meta: D ? `${ui.led('ok', 'Health recalculado')}<span class="mut">${ui.rel(new Date(Date.now() - 35 * 60000).toISOString(), { prefixo: '' })}</span>` : metaHealthReal(ctx) })}
 ${kpis}
 <div class="g-2-1 m-clientes-top">${matriz}${onb}</div>
 ${carteira}
@@ -176,4 +176,11 @@ function safrasReal(ctx) {
   const linhas = meses.map(m => { const l = todos.filter(c => String(c.desde).slice(0, 7) === m); return { m, n: l.length, ativos: l.filter(c => !encerrado(c)).length }; }).filter(x => x.n);
   return ui.card({ titulo, sub: '% de cada safra ainda ativa hoje', ajuda: 'Cada linha é uma safra (mês em que os clientes entraram), com a parcela que continua ativa hoje.',
     corpo: charts.calor({ linhas: linhas.map(x => `${fmt.mesAno(x.m + '-01')} · ${x.n}`), colunas: ['Hoje'], valores: linhas.map(x => [Math.round((x.ativos / x.n) * 100)]), formato: { eixo: v => `${v}%`, tip: v => `${v}% ainda ativos` }, min: 0, max: 100 }) });
+}
+/** produção: status do health a partir da rotina real "Health score" (se existir) — nunca um horário inventado */
+function metaHealthReal(ctx) {
+  const { ui, db } = ctx;
+  const r = db.list('routines').find(x => /health/i.test(`${x.id} ${x.nome}`));
+  if (!r) return `<span class="mut sm">${db.count('clients') ? 'Health score atualizado no cadastro' : 'Nenhum cliente cadastrado'}</span>`;
+  return `${ui.led(r.estado || 'off', 'Health recalculado')}${r.ultimaEm ? `<span class="mut">${ui.rel(r.ultimaEm, { prefixo: '' })}</span>` : ''}`;
 }
