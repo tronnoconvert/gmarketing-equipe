@@ -29,7 +29,7 @@ Deno.serve(servir(async (req) => {
     if (!admin && n.de !== c.perfil!.app_user_id) throw new HttpError(403, 'Você só pode disparar notificações que você mesmo enviou.', 'sem_permissao');
     const canais = (pedidos.length ? pedidos : (n.canais ?? []).filter((x): x is Canal => VALIDOS.includes(x as Canal)));
     if (!canais.length) continue;
-    const r = await enviarParaUsuario(org, String(n.para), canais, { titulo: String(n.titulo ?? 'Notificação'), texto: n.texto, link: n.link, prioridade: n.prioridade, tipo: n.tipo });
+    const r = await enviarParaUsuario(org, String(n.para), canais, { titulo: String(n.titulo ?? 'Notificação'), texto: n.texto, link: n.link, prioridade: n.prioridade, tipo: n.tipo, semRedigir: n.valorProprio === 'comissao' });
     resultados.push(...r.map((x) => ({ ...x, notificacao: id })));
     // registra o resultado na própria notificação (o app mostra "enviado por WhatsApp" se quiser)
     await gravar(org, 'notifications', [{ ...n, entregas: r.map((x) => ({ canal: x.canal, status: x.status, detalhe: x.detalhe ?? null, quando: new Date().toISOString() })) }]);

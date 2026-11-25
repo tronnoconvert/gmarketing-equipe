@@ -127,15 +127,51 @@ drop trigger if exists records_users_sync on public.records;
 create trigger records_users_sync after insert or update on public.records
   for each row when (new.col = 'users') execute function public.tg_users_sync_profile();
 
--- ---------------------------------------------------------------- realtime
--- O front assina mudanças em `records` (CFG.realtime). Adiciona a tabela à publicação, se existir.
+-- ---------------------------------------------------------------- realtime (feed leve, sem dados)
+-- O front NÃO assina a tabela `records` (o payload levaria valores de receita a quem não pode ver).
+-- Cada gravação gera uma linha em `records_feed` (só id, coleção e operação); o app recebe o aviso pelo
+-- Realtime e busca o registro de novo pela função segura `ler_record` (policies.sql), já sem os campos
+-- de receita para quem não tem a permissão.
+create table if not exists public.records_feed (
+  seq     bigint generated always as identity primary key,
+  rec_id  text not null,
+  col     text not null,
+  op      text not null check (op in ('INSERT','UPDATE','DELETE')),
+  org_id  text,
+  em      timestamptz not null default now()
+);
+create index if not exists records_feed_em_idx on public.records_feed (em);
+
+create or replace function public.tg_records_feed() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare r record := coalesce(new, old);
+begin
+  insert into public.records_feed (rec_id, col, op, org_id) values (r.id, r.col, tg_op, r.org_id);
+  if random() < 0.02 then delete from public.records_feed where em < now() - interval '2 days'; end if;
+  return null;
+end $$;
+drop trigger if exists records_feed_tg on public.records;
+create trigger records_feed_tg after insert or update or delete on public.records
+  for each row execute function public.tg_records_feed();
+
 do $$
 begin
-  if exists (select 1 from pg_publication where pubname = 'supabase_realtime')
-     and not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'records') then
-    execute 'alter publication supabase_realtime add table public.records';
+  if exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
+    if exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'records') then
+      execute 'alter publication supabase_realtime drop table public.records';
+    end if;
+    if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'records_feed') then
+      execute 'alter publication supabase_realtime add table public.records_feed';
+    end if;
   end if;
 end $$;
+
+-- ---------------------------------------------------------------- senha provisória (migração idempotente)
+-- O admin cria o login com uma senha provisória (Edge Function admin-invite, sem e-mail). No 1º acesso o app
+-- obriga a criar uma senha nova. trocar_senha = precisa trocar; senha_temp_hash = hash da provisória (a troca só
+-- é aceita quando o hash em auth.users mudou — ver concluir_troca_senha em policies.sql).
+alter table public.profiles add column if not exists trocar_senha boolean not null default false;
+alter table public.profiles add column if not exists senha_temp_hash text;
 
 -- ---------------------------------------------------------------- primeira organização
 -- Troque 'minha-agencia' e o nome (o mesmo id vai em public/config.js → orgId).

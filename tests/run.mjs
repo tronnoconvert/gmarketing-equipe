@@ -23,7 +23,7 @@ const VIEWPORTS = [[1366, 900], [1920, 1080], [390, 844]];
 
 /* ---------- build ---------- */
 if (!process.env.SKIP_BUILD) {
-  const b = spawnSync(process.execPath, [path.join(ROOT, 'build.mjs')], { stdio: 'inherit' });
+  const b = spawnSync(process.execPath, [path.join(ROOT, 'build.mjs')], { stdio: 'inherit', env: { ...process.env, AOS_DEMO: '1' } }); // testes: sempre modo demonstração
   if (b.status !== 0) { console.error('falha no build'); process.exit(1); }
 }
 

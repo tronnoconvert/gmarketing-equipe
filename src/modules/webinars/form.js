@@ -39,7 +39,8 @@ function preservarDinheiro(st, antes, linhasAntes) {
   const ven = st.ven.map(v => {
     const par = linhasAntes.find(d => d.tipo === 'venda' && !usadas.has(d.id) && d.data === v.data && d.canal === v.canal);
     if (par) usadas.add(par.id);
-    return { ...v, faturamento: par ? par.faturamento ?? null : null };
+    // _par: a linha já gravada continua com o mesmo id (o servidor preserva o faturamento que esta pessoa não vê)
+    return { ...v, faturamento: par ? par.faturamento ?? null : null, ...(par ? { _par: par.id } : {}) };
   });
   return { ...st, ticket: antes ? antes.ticket ?? null : null, vendas, ven };
 }
@@ -477,9 +478,14 @@ export function mountForm(el, ctx) {
     db.batch(() => {
       if (w0) salvo = db.update('webinars', w0.id, rec, { log: `${modo === 'rascunho' ? 'salvou rascunho do' : 'preencheu dados do'} webinar "${rec.tema}"` });
       else salvo = db.insert('webinars', { ...rec, checklist: checklistPadrao(rec.data, null) }, { log: `criou o webinar "${rec.tema}"` });
-      linhasAntes.forEach(d => db.remove('webinarDaily', d.id));
+      const manter = new Set(st.ven.map(d => d._par).filter(Boolean));
+      linhasAntes.forEach(d => { if (!manter.has(d.id)) db.remove('webinarDaily', d.id); });
       st.cap.forEach((d, i) => db.insert('webinarDaily', { id: `wd-${salvo.id}-c${i}-${Date.now().toString(36)}`, webinarId: salvo.id, tipo: 'captacao', ...d }));
-      st.ven.forEach((d, i) => db.insert('webinarDaily', { id: `wd-${salvo.id}-v${i}-${Date.now().toString(36)}`, webinarId: salvo.id, tipo: 'venda', ...d }));
+      st.ven.forEach((d, i) => {
+        const { _par, ...v } = d;
+        if (_par) db.update('webinarDaily', _par, { webinarId: salvo.id, tipo: 'venda', ...v });
+        else db.insert('webinarDaily', { id: `wd-${salvo.id}-v${i}-${Date.now().toString(36)}`, webinarId: salvo.id, tipo: 'venda', ...v });
+      });
     });
     // notifica quem entrou na equipe
     const antigos = new Set((w0 ? (antes.equipe || []) : []).map(e => e.id));

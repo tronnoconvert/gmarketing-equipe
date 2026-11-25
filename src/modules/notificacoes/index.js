@@ -20,6 +20,7 @@ function redigir(n) {
   return { titulo: String(n.titulo || '').replace(RS, 'valor restrito'), texto, semValores: true };
 }
 export function protegerReceita() {
+  if (DB.mode === 'supabase') return; // produção: o banco já entrega as notificações sem valores (filtrar_receita)
   try {
     const users = new Map(DB.list('users').map(u => [u.id, u]));
     DB.list('notifications', n => !n.semValores && n.valorProprio !== 'comissao' && (temRS(n.titulo) || temRS(n.texto))).forEach(n => {

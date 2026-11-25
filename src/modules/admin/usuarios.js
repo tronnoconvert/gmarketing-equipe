@@ -65,7 +65,7 @@ ${ui.kpi({ rotulo: 'Com 2FA', valor: '0', comp: `de ${ativos.filter(u => ADMINS.
   });
 
   const convCard = convites.length || f === 'convites' ? ui.card({
-    titulo: 'Convites em aberto', sub: 'Expiram 7 dias após o envio', pad: false, ajuda: 'No servidor, o convite é um e-mail do Supabase Auth com link para criar a senha. No modo demonstração, o acesso é criado na hora com senha temporária.',
+    titulo: 'Convites em aberto', sub: 'Expiram 7 dias após o envio', pad: false, ajuda: 'O acesso é criado na hora com uma senha provisória (sem e-mail). "Reenviar" gera uma senha provisória nova.',
     corpo: ui.tabela({
       legenda: 'Convites', cols: [
         { k: 'nome', l: 'Pessoa', r: i => `<b>${esc(i.nome)}</b><span class="sub">${esc(i.email)}</span>` },
@@ -185,9 +185,9 @@ function modalSenha(ctx, u, senha, titulo) {
   return ui.modal({
     titulo, sub: `${u.nome} · ${u.email}`, confirmar: 'Já anotei', cancelar: false, largura: 'sm',
     corpo: `<div class="stack">
-<p class="mb-txt">Senha temporária (mostrada só agora):</p>
+<p class="mb-txt">Senha provisória de <b>${esc(u.email)}</b> (mostrada só agora):</p>
 <div class="m-adm-senha"><code data-m-adm-senha>${esc(senha)}</code>${ui.btn({ rotulo: 'Copiar', icone: 'copy', sm: true, attrs: { 'data-m-adm-copiar': '' } })}</div>
-${ui.aviso({ tipo: 'warn', titulo: 'Envie por um canal privado.', texto: 'Depois de fechar esta janela a senha não aparece mais. A pessoa deve trocá-la no primeiro acesso. No servidor, o convite vai por e-mail e ninguém vê a senha.' })}
+${ui.aviso({ tipo: 'warn', titulo: 'Envie por WhatsApp para a pessoa (mensagem privada).', texto: 'Depois de fechar esta janela a senha não aparece mais. No primeiro acesso o app obriga a pessoa a criar a própria senha (mínimo 10 caracteres).' })}
 </div>`,
     onAbrir: el => el.querySelector('[data-m-adm-copiar]').addEventListener('click', () => copiar(senha, 'Senha copiada.')),
   });
@@ -197,11 +197,13 @@ async function redefinirSenha(ctx, id) {
   const { ui, db } = ctx;
   const u = db.get('users', id); if (!u) return;
   if (db.mode === 'supabase') {
-    const ok = await ui.confirmar(`Vamos enviar para ${u.email} um link para criar uma nova senha. A senha atual continua valendo até a pessoa trocar.`, { titulo: 'Enviar link de redefinição?', confirmar: 'Enviar e-mail', perigo: false });
+    const ok = await ui.confirmar(`A senha atual de ${u.nome} deixa de funcionar e uma senha provisória é gerada. Você envia para a pessoa (WhatsApp) e ela cria a senha nova no próximo acesso.`, { titulo: 'Gerar senha provisória?', confirmar: 'Gerar senha provisória' });
     if (!ok) return;
-    const r = await auth.esqueci(u.email);
-    ui.toast(r.ok ? `Link de redefinição enviado para ${u.email}.` : r.erro, { tipo: r.ok ? 'ok' : 'err' });
-    if (r.ok) db.insert('activity', { quem: ctx.real.id, quemNome: ctx.real.nome, oque: `enviou redefinição de senha para ${u.nome}`, col: 'users', refId: id, quando: new Date().toISOString() });
+    const { data, error } = await db.supabase.functions.invoke('admin-invite', { body: { acao: 'redefinir_senha', userId: id } });
+    if (error || !data || data.erro || !data.senha) { ui.toast(`Não foi possível gerar a senha: ${(data && data.erro) || (error && error.message) || 'erro no servidor'}`, { tipo: 'err' }); return; }
+    await modalSenha(ctx, u, data.senha, 'Senha provisória gerada');
+    try { await db.reload(); } catch (e) { /* o realtime traz depois */ }
+    ctx.refresh();
     return;
   }
   const ok = await ui.confirmar(`A senha atual de ${u.nome} deixa de funcionar e uma senha temporária é gerada.`, { titulo: 'Redefinir senha?', confirmar: 'Gerar senha temporária' });
@@ -220,10 +222,10 @@ ${ui.campo({ nome: 'email', rotulo: 'E-mail de trabalho', tipo: 'email', obrigat
 ${ui.campo({ nome: 'papel', rotulo: 'Papel', tipo: 'select', obrigatorio: true, valor: pre.papel || '', placeholder: 'Escolha…', opcoes: perms.PAPEIS_ORDEM.map(p => ({ v: p, l: perms.rotuloPapel(p) })), dica: 'Define o que a pessoa vê e edita. Dá para mudar depois.' })}
 ${ui.campo({ nome: 'teamId', rotulo: 'Vincular a colaborador da equipe', tipo: 'select', valor: pre.teamId || '', placeholder: 'Não vincular agora', opcoes: livres.map(t => ({ v: t.id, l: `${t.nome} · ${t.cargo || t.area || ''}` })), dica: 'Liga o login ao cadastro da equipe (clientes, horas, ocupação).' })}
 </div><p class="mut sm m-adm-pdesc" data-m-adm-pdesc></p>
-${db.mode === 'supabase' ? ui.aviso({ tipo: 'info', texto: 'A pessoa recebe um e-mail com link para criar a própria senha.' }) : ui.aviso({ tipo: 'info', texto: 'Modo demonstração: o acesso é criado na hora com uma senha temporária, mostrada uma única vez.' })}</form>`;
+${ui.aviso({ tipo: 'info', texto: db.mode === 'supabase' ? 'O acesso é criado na hora com uma senha provisória, mostrada uma única vez para você enviar à pessoa (WhatsApp). No primeiro acesso ela cria a própria senha. Nenhum e-mail é enviado.' : 'Modo demonstração: o acesso é criado na hora com uma senha temporária, mostrada uma única vez.' })}</form>`;
   let criado = null;
   const ok = await ui.modal({
-    titulo: 'Convidar usuário', corpo, confirmar: db.mode === 'supabase' ? 'Enviar convite' : 'Criar acesso', largura: 'md',
+    titulo: 'Convidar usuário', corpo, confirmar: 'Criar acesso', largura: 'md',
     onAbrir: el => {
       const f = el.querySelector('form'); const pd = el.querySelector('[data-m-adm-pdesc]');
       const desc = () => { const p = f.papel.value; pd.textContent = p ? `${perms.rotuloPapel(p)}: ${perms.PAPEIS[p].desc}` : ''; };
@@ -246,9 +248,9 @@ ${db.mode === 'supabase' ? ui.aviso({ tipo: 'info', texto: 'A pessoa recebe um e
       if (!r.ok) return false;
       const d = r.dados; d.email = emailNorm(d.email);
       if (db.mode === 'supabase') {
-        const { data, error } = await db.supabase.functions.invoke('admin-invite', { body: { acao: 'convidar', nome: d.nome.trim(), email: d.email, papel: d.papel, teamId: d.teamId || null, redirectTo: location.origin + location.pathname } });
-        if (error || (data && data.erro)) return `Não foi possível enviar o convite: ${(data && data.erro) || error.message}. Tente de novo ou verifique as Edge Functions.`;
-        criado = { email: d.email, servidor: true };
+        const { data, error } = await db.supabase.functions.invoke('admin-invite', { body: { acao: 'convidar', nome: d.nome.trim(), email: d.email, papel: d.papel, teamId: d.teamId || null } });
+        if (error || !data || data.erro || !data.senha) return `Não foi possível criar o acesso: ${(data && data.erro) || (error && error.message) || 'erro no servidor'}. Tente de novo ou verifique as Edge Functions.`;
+        criado = { servidor: true, senha: data.senha, u: { id: data.userId, nome: d.nome.trim(), email: d.email, papel: d.papel } };
         return true;
       }
       const t = d.teamId ? db.get('team', d.teamId) : null;
@@ -264,7 +266,13 @@ ${db.mode === 'supabase' ? ui.aviso({ tipo: 'info', texto: 'A pessoa recebe um e
     },
   });
   if (!ok || !criado) return;
-  if (criado.servidor) { ui.toast(`Convite enviado para ${criado.email}.`); return; }
+  if (criado.servidor) {
+    await modalSenha(ctx, criado.u, criado.senha, 'Acesso criado');
+    try { await db.reload(); } catch (e) { /* o realtime traz depois */ }
+    ctx.refresh();
+    ui.toast(`${criado.u.nome} já pode entrar com ${criado.u.email} e a senha provisória.`);
+    return;
+  }
   ctx.notify.enviar({ para: [criado.u.id], tipo: 'sistema', titulo: 'Bem-vindo ao Gmarketing', texto: `${ctx.real.nome} criou seu acesso como ${perms.rotuloPapel(criado.u.papel)}. Troque a senha temporária no primeiro acesso.`, link: '#/notificacoes' });
   await modalSenha(ctx, criado.u, criado.senha, 'Acesso criado');
   ctx.refresh();
@@ -275,8 +283,12 @@ async function reenviar(ctx, id) {
   const { db, ui } = ctx;
   const i = db.get('invites', id); if (!i) return;
   if (db.mode === 'supabase') {
-    const { data, error } = await db.supabase.functions.invoke('admin-invite', { body: { acao: 'reenviar', email: i.email, inviteId: i.id, redirectTo: location.origin + location.pathname } });
-    if (error || (data && data.erro)) { ui.toast(`Não foi possível reenviar: ${(data && data.erro) || error.message}`, { tipo: 'err' }); return; }
+    const { data, error } = await db.supabase.functions.invoke('admin-invite', { body: { acao: 'reenviar', email: i.email, inviteId: i.id } });
+    if (error || !data || data.erro || !data.senha) { ui.toast(`Não foi possível gerar a senha: ${(data && data.erro) || (error && error.message) || 'erro no servidor'}`, { tipo: 'err' }); return; }
+    await modalSenha(ctx, { nome: i.nome, email: i.email }, data.senha, 'Senha provisória gerada');
+    try { await db.reload(); } catch (e) { /* o realtime traz depois */ }
+    ctx.refresh();
+    return;
   }
   const antes = { ...i };
   db.update('invites', id, { status: 'pendente', enviadoEm: new Date().toISOString(), expiraEm: new Date(Date.now() + 7 * 864e5).toISOString(), reenvios: (i.reenvios || 0) + 1, enviadoPor: ctx.real.id }, { log: `reenviou o convite de ${i.nome}` });

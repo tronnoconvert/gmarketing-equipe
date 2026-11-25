@@ -19,14 +19,14 @@
   - Depois de pronto, remover o iframe e a pasta public/torre.
 
 ## Também pendente para a hospedagem
-- Aplicar a regra "receita só para Dono/Admin" também no banco (RLS/visões no Supabase), não só na tela.
+- ✅ (25/11) Regra "receita só para Dono/Admin" aplicada no banco (funções seguras + merge na gravação + realtime sem dados).
 - Fotos da equipe no Supabase Storage (hoje ficam no registro como data URL).
-- Rodar o checklist de 15 min do docs/DEPLOY.md com usuários de teste.
+- ✅ (25/11) Teste real com usuários de teste (`tests/live/producao.mjs`); falta o checklist com as pessoas reais.
 - Tela Campanha (conta própria do dono): **duas contas** — CA01 (act_1906477940242386) e CA02 · HOF (act_848802707655510), via Windsor.
   Adaptar o módulo para várias contas: seletor "CA01 / CA02 / As duas (somadas)".
 - Windsor: 72 contas Meta ativas; 14 inativas precisam de novo login no Windsor (link via get_connector_connect_info na hora de ligar o Painel de Voo).
-- Supabase: projeto "gmarketing-equipe" (ref hzonfbqsjxiwfmjywdlw, us-east-1), vazio — usar este.
-- Login sem e-mail: senha provisória gerada pelo admin + troca obrigatória no 1º acesso (sem Resend).
+- Supabase: projeto "gmarketing-equipe" (ref hzonfbqsjxiwfmjywdlw, us-east-1) — banco, funções e config prontos; vazio.
+- ✅ (25/11) Login sem e-mail: senha provisória gerada pelo admin + troca obrigatória no 1º acesso (sem Resend).
 - Painel de Voo (item 17) pronto ANTES de liberar a equipe.
 
 ## Fora do escopo por decisão do dono

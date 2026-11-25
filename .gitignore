@@ -3,3 +3,5 @@ dist/
 *.log
 .DS_Store
 docs/.fase*
+supabase/.temp/
+deno.lock

@@ -9,6 +9,27 @@ endereço na internet — a **hospedagem estática**.
 
 ---
 
+## 0. Situação do projeto Gmarketing (25/11/2026)
+
+Já está pronto no Supabase **gmarketing-equipe** (ref `hzonfbqsjxiwfmjywdlw`, us-east-1):
+
+| Item | Situação |
+|---|---|
+| Banco (`schema.sql` + `policies.sql`) | ✅ aplicado, org `gmarketing`, matriz de permissões padrão. **Sem dados** (nenhum usuário, nenhum registro). |
+| Receita protegida no banco | ✅ quem não tem a permissão **receita** (padrão: só Dono e Admin) não recebe MRR, faturamento, ticket, valores de contrato, comissões alheias, faturas/caixa/DRE — nem pela tela, nem pela rede, nem pelo realtime (seção 7). |
+| Login sem e-mail | ✅ senha provisória criada pelo admin + troca obrigatória no 1º acesso (seção 2.5). |
+| Edge Functions | ✅ publicadas: `admin-invite`, `notify`, `routines-runner`, `windsor-proxy`, `monday-sync`, `guardiao` (todas ativas; sem chave de provedor respondem "não configurado"). |
+| Segredos gerados | ✅ `CRON_SECRET`, `BOOTSTRAP_SECRET`, `DEFAULT_ORG_ID=gmarketing` (Edge Functions › Secrets). |
+| `public/config.js` | ✅ preenchido com a URL e a anon key (públicas), `orgId: 'gmarketing'`, `seedDemo: false`. |
+| Agendamentos (pg_cron) | ⏸ infraestrutura pronta (Vault + `aos_chamar_funcao`), **nenhum job ligado** — ver 2.8. |
+| Teste de ponta a ponta | ✅ `tests/live/producao.mjs` passou contra o projeto real (35 verificações) e apagou tudo no final. |
+
+**Falta o dono:** (1) mandar os e-mails reais de Gabriel e Rayane para criar os dois primeiros acessos (2.5);
+(2) hospedar a pasta `dist/` na Hostinger com o domínio (2.7); (3) colar as chaves dos provedores (2.4) quando for ligar
+Windsor, monday, WhatsApp e Meta.
+
+---
+
 ## 1. O que você vai contratar e por quê
 
 | Serviço | Para que serve | Plano sugerido | Custo mensal estimado* |
@@ -19,7 +40,7 @@ endereço na internet — a **hospedagem estática**.
 | **Windsor.ai** | Puxa os dados da conta de anúncios da agência (tela Campanha) | Plano básico | US$ 19–99 (≈ R$ 100–550), conforme nº de contas |
 | **monday.com** | Já usado pela agência; o app importa o cadastro de clientes | Plano atual (a API já vem incluída) | R$ 0 a mais |
 | **WhatsApp** (opcional) | Notificações e resumo diário no WhatsApp | **Z-API** (simples, número próprio) ou **Twilio** (API oficial) | Z-API ≈ R$ 100/instância · Twilio: por mensagem (centavos) + taxa da Meta |
-| **E-mail** (opcional) | Convites, redefinição de senha e notificações | **Resend** (3.000 e-mails/mês grátis) ou o SMTP do seu e-mail | R$ 0 a US$ 20 |
+| **E-mail** (opcional) | Notificações por e-mail (os logins usam senha provisória, sem e-mail) | **Resend** (3.000 e-mails/mês grátis) ou o SMTP do seu e-mail | R$ 0 a US$ 20 |
 | **Slack** (opcional) | Alertas no canal da equipe | Webhook do Slack | R$ 0 |
 
 \*Estimativas de novembro/2026, com dólar entre R$ 5,20 e R$ 5,80. Preços mudam: confirme no site de cada serviço.
@@ -93,44 +114,59 @@ Sem provedor de WhatsApp configurado nada é enviado: a fatura recebe o registro
 há nova tentativa no mesmo dia. Para testar sem enviar: chame a função com `{"dryRun": true}` (conta quantos sairiam);
 para rodar só os alertas: `{"lembretes": false}`.
 
-Para o e-mail de convite sair com o seu domínio, configure também o SMTP do Supabase Auth
-(**Authentication › Emails › SMTP Settings**) com os dados do Resend.
+Os logins **não dependem de e-mail** (senha provisória, seção 2.5). Resend/SMTP só são usados para notificações por e-mail.
 
-### 2.5 Criar o primeiro Dono
-1. **Authentication › Users › Add user › Create new user**: seu e-mail e uma senha forte, marque *Auto Confirm User*.
-2. No **SQL Editor**, rode (troque o e-mail, o nome e o id da agência):
+### 2.5 Criar os primeiros donos (Gabriel e Rayane) — sem e-mail
+O login funciona **sem envio de e-mail**: quem administra cria o acesso e recebe uma **senha provisória** (mostrada uma
+única vez) para mandar à pessoa por WhatsApp. No primeiro acesso o app obriga a criar a senha pessoal
+(mínimo 10 caracteres, confirmação e indicador de força). A senha provisória nunca fica gravada no banco do app.
+
+Os **dois primeiros** acessos (Dono e Admin) são criados uma única vez com o script `scripts/criar-dono.mjs`, que chama a
+função `admin-invite` (ação `bootstrap`) protegida pelo segredo `BOOTSTRAP_SECRET`:
+
+1. **Defina o valor do segredo** (o valor gerado na instalação não pode ser lido de volta — o painel do Supabase só mostra o
+   resumo/digest dos segredos): Supabase › **Edge Functions › Secrets** › `BOOTSTRAP_SECRET` › editar › cole uma frase
+   longa e aleatória sua (mínimo 32 caracteres; ex.: gere em um gerenciador de senhas) › **Save**.
+   Pelo terminal: `supabase secrets set BOOTSTRAP_SECRET=...`.
+2. No computador, na pasta do projeto (Node 18+):
+   ```bash
+   BOOTSTRAP_SECRET='a-mesma-frase' node scripts/criar-dono.mjs --nome "Gabriel Leão" --email EMAIL-DO-GABRIEL --papel dono
+   BOOTSTRAP_SECRET='a-mesma-frase' node scripts/criar-dono.mjs --nome "Rayane Leão" --email EMAIL-DA-RAYANE --papel admin
+   ```
+   Cada comando mostra a **senha provisória** uma vez. Envie a cada pessoa no privado.
+3. Cada um entra no app com o e-mail + senha provisória → tela **"Crie sua nova senha"** → pronto.
+4. **Desligue o bootstrap:** apague o segredo `BOOTSTRAP_SECRET` (Edge Functions › Secrets › excluir).
+
+Regras de segurança do bootstrap: só funciona com o segredo certo e **enquanto a agência tiver menos de 2 donos/admins**;
+cria o login no Auth (e-mail já confirmado), o perfil, o registro `users` e o colaborador em `team`. Rodar de novo com o
+mesmo e-mail, antes da pessoa criar a senha, gera outra senha provisória (se ela se perdeu). Para conferir no SQL Editor:
 ```sql
-insert into public.profiles (user_id, org_id, papel, team_id, app_user_id)
-select id, 'agencia-leao', 'dono', 't-gabriel', 'u-gabriel' from auth.users where email = 'voce@suaagencia.com.br';
-
-insert into public.records (id, col, data, org_id) values
-('users:u-gabriel', 'users', jsonb_build_object('id','u-gabriel','nome','Gabriel Leão','email','voce@suaagencia.com.br','papel','dono',
-  'ativo',true,'teamId','t-gabriel','iniciais','GL','avatarCor','#0B6BE8','cargo','Fundador e CEO',
-  'authId',(select id::text from auth.users where email = 'voce@suaagencia.com.br')), 'agencia-leao'),
-('team:t-gabriel', 'team', jsonb_build_object('id','t-gabriel','nome','Gabriel Leão','email','voce@suaagencia.com.br','cargo','Fundador e CEO',
-  'area','Diretoria','papel','dono','userId','u-gabriel','ativo',true,'status','online','custoHora',0,'horasMes',0,'skills','[]'::jsonb), 'agencia-leao');
+select u.email, p.papel, p.trocar_senha from public.profiles p join auth.users u on u.id = p.user_id;
 ```
-3. As demais pessoas você convida pelo próprio app: **Administração › Usuários › Convidar usuário** (cada uma recebe um
-   e-mail para criar a senha). Antes, cadastre-as em **Administração › Equipe**.
+
+**Demais pessoas:** Administração › Usuários › **Convidar usuário** (antes, cadastre a pessoa em Administração › Equipe e
+vincule). O app mostra a senha provisória com botão **Copiar** e o aviso "envie por WhatsApp".
+**Esqueceu a senha?** Na tela de login, "Esqueci minha senha" orienta a pedir ao administrador; o admin usa
+Administração › Usuários › ⋯ › **Redefinir senha** (gera nova senha provisória; só um Dono redefine a senha de outro Dono).
 
 ### 2.6 Ligar o app ao Supabase
-Abra `public/config.js` e preencha (são valores públicos):
-```js
-window.AOS_CONFIG = Object.assign({
-  supabaseUrl: 'https://abcd1234.supabase.co',
-  supabaseAnonKey: 'eyJ...anon...',
-  orgId: 'agencia-leao',
-  seedDemo: false,     // não grava os dados fictícios do modo demonstração no banco real
-  realtime: true,
-}, window.AOS_CONFIG || {});
-```
-**Nunca** coloque a service_role key, a chave da Windsor, tokens do monday/Meta ou do WhatsApp neste arquivo.
+**Já feito** para o projeto Gmarketing: `public/config.js` tem `supabaseUrl`, a anon key (pública), `orgId: 'gmarketing'`,
+`seedDemo: false` e `realtime: true`. **Nunca** coloque a service_role key, a chave da Windsor, tokens do monday/Meta ou do
+WhatsApp neste arquivo.
 
 ### 2.7 Gerar e publicar o site
 ```bash
 npm install
-npm run build          # cria a pasta dist/
+npm run build              # PRODUÇÃO: cria dist/ usando public/config.js (Supabase)
+AOS_DEMO=1 npm run build   # DEMONSTRAÇÃO: mesmo app, config vazio → dados fictícios no navegador
 ```
+`npm test` sempre gera o build de demonstração. O arquivo único de prévia (`dist/agencia-os.html`, "Protótipo Oficial")
+nunca carrega `config.js`, então continua em modo demonstração mesmo no build de produção.
+O app carrega a biblioteca do Supabase de `cdn.jsdelivr.net` (supabase-js 2.45.4); para não depender do CDN, copie o
+arquivo para a hospedagem e aponte `supabaseEsm` em `config.js`.
+
+* **Hostinger (escolha do dono):** hPanel › Gerenciador de arquivos › `public_html` (ou a pasta do subdomínio, ex.:
+  `painel.seudominio.com.br`) › envie o **conteúdo** de `dist/` (index.html, app.js, app.css, config.js, torre/).
 * **Netlify:** app.netlify.com › Add new site › Deploy manually › arraste a pasta `dist/`.
 * **Render:** New › Static Site › conecte o repositório › Build command `npm install && npm run build` › Publish directory `dist`.
 * **Vercel:** New Project › importe o repositório › Build command `npm run build` › Output directory `dist`.
@@ -139,17 +175,29 @@ Depois aponte o domínio (ex.: `painel.suaagencia.com.br`) no painel da hospedag
 criar no Registro.br) e atualize `APP_URL` e a *Site URL* do Supabase se o endereço mudar.
 
 ### 2.8 Agendamentos (opcional, recomendado)
-Para os alertas rodarem sozinhos a cada 15 min e o monday sincronizar de hora em hora: edite os 3 valores no topo de
-`supabase/cron.sql` (endereço do projeto, anon key e o mesmo `CRON_SECRET`) e rode no SQL Editor.
+No projeto Gmarketing a infraestrutura já está pronta: extensões `pg_cron`/`pg_net`, os 3 valores no **Vault**
+(`aos_functions_url`, `aos_anon_key`, `aos_cron_secret` = o mesmo `CRON_SECRET` das funções) e a função
+`public.aos_chamar_funcao` (testada: o `routines-runner` respondeu 200). **Nenhum job está ligado**, porque o monday-sync e o
+Guardião precisam das chaves dos provedores e o routines-runner ainda não tem regras de alerta cadastradas
+(produção começa vazia). Ligue no SQL Editor quando for a hora:
+```sql
+-- regras de alerta a cada 15 min (depois de cadastrar as regras em Alertas)
+select cron.schedule('aos-routines-runner', '*/15 * * * *', $$select public.aos_chamar_funcao('routines-runner')$$);
+-- monday.com de hora em hora (depois de MONDAY_API_TOKEN)
+select cron.schedule('aos-monday-sync', '7 * * * *', $$select public.aos_chamar_funcao('monday-sync')$$);
+-- Guardião a cada 2 min (depois de META_SYSTEM_USER_TOKEN ou WINDSOR_API_KEY)
+select cron.schedule('aos-guardiao', '*/2 * * * *', $$select public.aos_chamar_funcao('guardiao')$$);
+```
+Em outro projeto: edite os 3 valores no topo de `supabase/cron.sql` e rode no SQL Editor.
 
 ---
 
 ## 3. Checklist de teste (15 minutos)
 
 - [ ] Abrir o endereço do app: aparece a tela de login **sem** o selo "Modo demonstração".
-- [ ] Entrar com o Dono criado no passo 2.5.
+- [ ] Entrar com o Dono criado no passo 2.5 (senha provisória → tela "Crie sua nova senha").
 - [ ] Administração › Integrações › Verificar agora: LEDs verdes nas integrações configuradas.
-- [ ] Administração › Equipe: cadastrar uma pessoa · Usuários: convidá-la · ela recebe o e-mail e consegue entrar.
+- [ ] Administração › Equipe: cadastrar uma pessoa · Usuários: convidá-la · copiar a senha provisória · ela entra e cria a senha dela.
 - [ ] Entrar como essa pessoa (ou usar "Ver como"): ela vê só os módulos do papel e só os clientes dela.
 - [ ] Notificações › Enviar mensagem para ela com WhatsApp/e-mail marcados: chega (se os provedores estiverem configurados).
 - [ ] Administração › Permissões: mudar uma célula, salvar, e confirmar que a pessoa passa a ver/não ver o módulo.
@@ -171,10 +219,16 @@ Para os alertas rodarem sozinhos a cada 15 min e o monday sincronizar de hora em
 - [ ] Revisar Administração › Auditoria uma vez por mês.
 - [ ] Se uma chave vazar: gere outra no serviço, rode `supabase secrets set` de novo e publique as funções.
 
-## 5. Antes de usar com dados reais (o que ainda não foi testado)
+## 5. Antes de usar com dados reais (o que já foi e o que ainda não foi testado)
 
-- **Login no modo servidor:** o ajuste de recarregar os dados logo após o login já foi feito (`db.reload()` em `src/core/store.js`, chamado por `auth.login`). Mesmo assim, o modo servidor **nunca rodou contra um projeto Supabase de verdade** — faça o checklist da seção 3 com um usuário de teste antes de convidar a equipe.
-- **Funções do servidor:** passaram na checagem de tipos (`deno check`) e as regras de segurança passaram em 48 testes num PostgreSQL 16 local, mas as chamadas reais ao Windsor, monday.com, WhatsApp e e-mail só podem ser testadas com as chaves de vocês.
+- **Login no modo servidor: testado de verdade** em 25/11/2026 contra o projeto gmarketing-equipe com
+  `tests/live/producao.mjs` (bootstrap do dono, troca obrigatória de senha, criação de gestor pela tela, leitura sem receita,
+  edição preservando o MRR, realtime, notificações) — 35 verificações, e o teste apagou tudo no final.
+- **Funções do servidor:** publicadas e respondendo (401 sem sessão; "não configurado" sem chave de provedor). As chamadas
+  reais ao Windsor, monday.com, WhatsApp e e-mail só podem ser testadas com as chaves de vocês.
+- **Regras de segurança:** `supabase/tests/rls_test.sql` — 92 verificações num PostgreSQL 16 local.
+- **Alertas essenciais e catálogo de rotinas:** a produção começa vazia (os 7 alertas e as rotinas do modo demonstração
+  usam pessoas fictícias). Cadastre as regras em Alertas depois que a equipe existir.
 - **Conta da tela Campanha:** informe o ID da conta de anúncios (formato `act_...`) em Campanha › Conexão depois de configurar o `WINDSOR_API_KEY`.
 
 ## 6. Guardião de segurança (possível invasão nas contas Meta Ads)
@@ -199,3 +253,22 @@ pausa sozinha as campanhas de uma conta com sinal forte de invasão e avisa todo
 4. Publique e agende: `supabase functions deploy guardiao` e rode o trecho final de `supabase/cron.sql`.
 5. Teste sem pausar nada:
    `curl -X POST https://SEU-PROJETO.supabase.co/functions/v1/guardiao -H "Authorization: Bearer SUA_ANON_KEY" -H "x-cron-secret: $CRON_SECRET" -d '{"dryRun":true}'`
+
+## 7. Receita protegida no banco (regra do dono)
+"Dinheiro que entra (MRR, faturamento, receita, ticket, ROAS da agência, lucro, valores de contrato, comissões) só para Dono e
+Admin" vale **no banco**, não só na tela. Quem não tem a permissão **receita** (linha "Receita e faturamento" em
+Administração › Permissões; padrão: só Dono e Admin):
+
+- **não lê** faturas, contas a pagar, caixa, movimentos de MRR, DRE e custos (`invoices payables cash mrrMoves finance costs`);
+- recebe **sem as chaves de receita**: `clients.mrr`, `contracts.mrr/valor`, `webinars.ticket/faturamento/vendas.{reembolsos,pendentes,custos,taxa}`,
+  `webinarDaily.faturamento`, `campaignDaily/campaigns.action_values_purchase`; `deals.valor` e a meta de novo MRR só para quem
+  edita o Comercial; das comissões (`clients.comissoes`) só a **própria**, já em R$/mês;
+- não recebe alertas com MRR/faturamento no título (o trecho com R$ sai do detalhe), insights de receita, regras de alerta do
+  Financeiro e as rotinas de MRR/cobrança; notificações e auditoria chegam com "valor restrito" no lugar de R$; o WhatsApp/e-mail
+  das funções segue a mesma regra;
+- **ao gravar**, o servidor preserva os valores que a pessoa não vê (ela edita o segmento do cliente e o MRR continua igual).
+
+Como funciona: o app lê pela função `ler_records`/`ler_record` e grava por `gravar_record`/`apagar_record`
+(`supabase/policies.sql`); o SELECT direto na tabela `records` dessas coleções é bloqueado para quem não vê receita; o realtime
+avisa só "o registro X mudou" (`records_feed`) e o app busca de novo pela função segura. Mudar a matriz em Administração ›
+Permissões (ex.: liberar receita para o Financeiro) vale na hora, também no banco.

@@ -55,8 +55,12 @@ const LocalAdapter = {
   clear() { try { localStorage.removeItem(KEY); } catch (e) { /* memória */ } },
 };
 
+// Produção: o app NÃO lê nem grava a tabela `records` direto. Usa as funções seguras do banco (supabase/policies.sql):
+//   ler_records / ler_record → já aplicam o RLS e tiram os valores de receita de quem não tem a permissão 'receita'
+//   gravar_record / apagar_record → mesmas regras do RLS; o servidor preserva os valores de receita já gravados
+//   realtime → assina `records_feed` (só id/coleção/operação) e busca o registro de novo por ler_record
 const SupabaseAdapter = {
-  name: 'supabase', client: null, orgId: CFG.orgId || null,
+  name: 'supabase', client: null, orgId: CFG.orgId || null, canal: null, filas: new Map(),
   async init() {
     const url = CFG.supabaseEsm || SUPA_ESM;
     const mod = await import(/* webpackIgnore: true */ url);
@@ -64,32 +68,52 @@ const SupabaseAdapter = {
     return this.client;
   },
   async load() {
-    const out = {}; let from = 0; const page = 1000;
+    const out = {}; let apos = ''; const page = 1000;
     for (;;) {
-      const { data, error } = await this.client.from('records').select('id,col,data').range(from, from + page - 1);
+      const { data, error } = await this.client.rpc('ler_records', { p_apos: apos, p_limite: page });
       if (error) throw error;
-      for (const r of data) (out[r.col] || (out[r.col] = [])).push(r.data);
-      if (data.length < page) break; from += page;
+      for (const r of data || []) (out[r.col] || (out[r.col] = [])).push(r.data);
+      if (!data || data.length < page) break;
+      apos = data[data.length - 1].id;
     }
     return out;
   },
+  /** grava em fila por registro (a ordem das gravações do mesmo registro é preservada) */
   write(col, op, obj) {
     if (!this.client) return;
     const id = `${col}:${obj.id}`;
-    const q = op === 'remove'
-      ? this.client.from('records').delete().eq('id', id)
-      : this.client.from('records').upsert({ id, col, data: obj, org_id: this.orgId, updated_at: nowIso() });
-    q.then(({ error }) => { if (error) { console.warn('[Gmarketing] falha ao salvar no Supabase:', error.message); emit(col, 'erro', { id: obj.id, erro: error.message }); } });
+    const dados = op === 'remove' ? null : clone(obj);
+    const antes = this.filas.get(id) || Promise.resolve();
+    const p = antes.then(() => (op === 'remove'
+      ? this.client.rpc('apagar_record', { p_id: id })
+      : this.client.rpc('gravar_record', { p_col: col, p_data: dados })))
+      .then(({ error }) => { if (error) { console.warn('[Gmarketing] falha ao salvar no Supabase:', error.message); emit(col, 'erro', { id: obj.id, erro: error.message }); } })
+      .catch(e => { console.warn('[Gmarketing] falha ao salvar no Supabase:', e && e.message); emit(col, 'erro', { id: obj.id, erro: (e && e.message) || 'erro' }); })
+      .finally(() => { if (this.filas.get(id) === p) this.filas.delete(id); });
+    this.filas.set(id, p);
+  },
+  /** espera as gravações pendentes (testes e logout) */
+  pendentes() { return Promise.all([...this.filas.values()]); },
+  async aplicarRemoto(recId, col, op) {
+    const a = arr(col); const rid = recId.slice(col.length + 1);
+    let novo = null;
+    if (op !== 'DELETE') {
+      const { data, error } = await this.client.rpc('ler_record', { p_id: recId });
+      if (error) { console.warn('[Gmarketing] realtime: falha ao ler', recId, error.message); return; }
+      novo = data;
+    }
+    const i = a.findIndex(o => o.id === rid);
+    if (!novo) { if (i >= 0) { a.splice(i, 1); emit(col, 'remove', { id: rid }, true); } return; }
+    if (i >= 0) a[i] = novo; else a.push(novo);
+    emit(col, i >= 0 ? 'update' : 'insert', novo, true);
   },
   realtime() {
     if (!this.client || CFG.realtime === false) return;
     try {
-      this.client.channel('records').on('postgres_changes', { event: '*', schema: 'public', table: 'records' }, p => {
-        const row = p.new && p.new.col ? p.new : p.old; if (!row || !row.col) return;
-        const a = arr(row.col); const rid = row.id.slice(row.col.length + 1);
-        const i = a.findIndex(o => o.id === rid);
-        if (p.eventType === 'DELETE') { if (i >= 0) a.splice(i, 1); emit(row.col, 'remove', { id: rid }, true); }
-        else { if (i >= 0) a[i] = p.new.data; else a.push(p.new.data); emit(row.col, i >= 0 ? 'update' : 'insert', p.new.data, true); }
+      if (this.canal) { try { this.client.removeChannel(this.canal); } catch (e) { /* ignora */ } this.canal = null; }
+      this.canal = this.client.channel('records-feed').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'records_feed' }, p => {
+        const f = p.new; if (!f || !f.rec_id || !f.col) return;
+        this.aplicarRemoto(f.rec_id, f.col, f.op);
       }).subscribe();
     } catch (e) { console.warn('[Gmarketing] realtime indisponível', e && e.message); }
   },
@@ -227,9 +251,12 @@ export const db = {
     if (!SUPA || !SupabaseAdapter.client) return;
     try { mem = await SupabaseAdapter.load(); COLS.forEach(arr); db.loadError = null; }
     catch (e) { db.loadError = (e && e.message) || 'erro desconhecido'; throw e; }
+    SupabaseAdapter.realtime(); // reassina com a sessão nova (o RLS do feed depende de quem está logado)
     try { listeners.forEach(fn => { try { fn('*', 'reload', null); } catch (_) {} }); } catch (_) {}
   },
   _flush() { adapter.flush(); },
+  /** Supabase: espera as gravações em andamento */
+  async _pendentes() { if (SUPA) await SupabaseAdapter.pendentes(); },
   _storageOk() { return adapter === LocalAdapter ? LocalAdapter.storageOk : true; },
 };
 

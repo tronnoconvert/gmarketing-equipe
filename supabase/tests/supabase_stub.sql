@@ -6,12 +6,14 @@ do $$ begin
   if not exists (select 1 from pg_roles where rolname = 'service_role') then create role service_role nologin bypassrls; end if;
 end $$;
 create schema if not exists auth;
-create table if not exists auth.users (id uuid primary key, email text);
+create table if not exists auth.users (id uuid primary key, email text, encrypted_password text);
+alter table auth.users add column if not exists encrypted_password text;
+do $$ begin if not exists (select 1 from pg_publication where pubname = 'supabase_realtime') then create publication supabase_realtime; end if; end $$;
 create or replace function auth.uid() returns uuid language sql stable as $$
-  select nullif(current_setting('request.jwt.claims', true)::jsonb->>'sub', '')::uuid
+  select nullif(nullif(current_setting('request.jwt.claims', true), '')::jsonb->>'sub', '')::uuid
 $$;
 create or replace function auth.role() returns text language sql stable as $$
-  select coalesce(current_setting('request.jwt.claims', true)::jsonb->>'role', current_user)
+  select coalesce(nullif(current_setting('request.jwt.claims', true), '')::jsonb->>'role', current_user)
 $$;
 grant usage on schema auth, public to anon, authenticated, service_role;
 grant execute on all functions in schema auth to anon, authenticated, service_role;

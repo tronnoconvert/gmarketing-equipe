@@ -60,13 +60,13 @@ db.mode 'demo'|'supabase' · db.reset() (demo: apaga e ressemeia, recarrega)
 - Campos que o core lê: `clients.respId` (teamId) e `clients.equipe` ([teamId]) para escopo; `alerts.{estado|gravidade, status|resolvido}`, `routines.estado`, `integrations.estado` (`ok|warn|err|off`, `ativo:false` ignora) para a **luz mestra**.
 - `team` (core): `{id, nome, iniciais, cargo, area, papel, email, userId, avatarCor, status: online|ausente|ferias, statusAte, custoHora, horasMes, faturavel, gestorId, skills, ativo, telefone, desde}`. Para acrescentar campos use `db.update` (não re-semeie).
 - `users`: `{id, nome, iniciais, email, papel, teamId, avatarCor, cargo, ativo, senha (só demo), ultimoAcesso}`.
-- Supabase: tabela genérica `records(id text pk = '<col>:<id>', col text, data jsonb, created_at, updated_at, org_id)`, tudo carregado na memória no boot; escritas via upsert; realtime opcional. Ativado por `window.AOS_CONFIG = {supabaseUrl, supabaseAnonKey, orgId?, seedDemo?, realtime?}` em `config.js`.
+- Supabase: tabela genérica `records(id text pk = '<col>:<id>', col text, data jsonb, created_at, updated_at, org_id)`, tudo carregado na memória no boot pela função `ler_records` (já filtrada: RLS + receita); escritas por `gravar_record`/`apagar_record` (em fila por registro; o servidor preserva os valores de receita que a pessoa não vê); realtime pelo feed `records_feed` + `ler_record`. `await db._pendentes()` espera as gravações em andamento. Detalhes em `supabase/README.md`. Ativado por `window.AOS_CONFIG = {supabaseUrl, supabaseAnonKey, orgId?, seedDemo?, realtime?}` em `config.js`.
 
 ## 4. auth / perms
 ```js
 auth.user()  // efetivo (em "ver como" = a pessoa vista) {id, nome, email, papel, teamId, avatarCor, cargo}
 auth.real()  · auth.vendoComo() · auth.podeVerComo() · auth.verComo(userId) · auth.voltar()
-auth.login(email, senha) -> Promise<{ok, erro}> · auth.logout() · auth.esqueci(email) · auth.onChange(fn) · auth.demo
+auth.login(email, senha) -> Promise<{ok, erro} | {ok:false, trocarSenha:true, user}> · auth.trocarSenha(nova, confirmacao) (produção: senha provisória → senha pessoal, mín. 10) · auth.logout() · auth.esqueci(email) (produção: orienta pedir senha provisória ao admin) · auth.onChange(fn) · auth.demo
 perms.can(mod, acao='ver')   // ações: ver | editar | excluir | admin
 perms.nivel(mod) -> ''|'ver'|'editar'|'admin' · perms.escopo(mod) -> 'todos'|'seus'|'proprio'
 perms.escopoClientes() -> 'todos' | [clientIds] · perms.podeCliente(id) · perms.filtrarPorEscopo(lista, 'clientId')

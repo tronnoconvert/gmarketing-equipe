@@ -1,11 +1,27 @@
 // _shared/envio.ts — canais externos (WhatsApp via Z-API ou Twilio, e-mail via Resend ou SMTP, Slack via webhook).
 // Sem a variável de ambiente do provedor, o canal vira "no-op" com log (não quebra nada).
 import { buscar, env } from './http.ts';
-import { obter, type Obj } from './supa.ts';
+import { adminClient, obter, type Obj } from './supa.ts';
 
 export type Canal = 'app' | 'whatsapp' | 'email' | 'slack';
 export interface Resultado { canal: Canal; para: string; ok: boolean; status: 'enviado' | 'nao_configurado' | 'pulado' | 'falhou'; detalhe?: string }
-export interface Mensagem { titulo: string; texto?: string; link?: string; prioridade?: 'normal' | 'alta'; tipo?: string }
+export interface Mensagem { titulo: string; texto?: string; link?: string; prioridade?: 'normal' | 'alta'; tipo?: string; semRedigir?: boolean }
+
+/* ---------------- receita: valores em R$ só para quem tem a permissão (mesma regra do app e do banco) ---------------- */
+const RS = /R\$\s?[\d.,]+(\s?(mil|k))?(\/m[eê]s)?/gi;
+const temRS = (t?: string) => /R\$\s?\d/.test(String(t ?? ''));
+export function redigir(m: Mensagem): Mensagem {
+  if (!temRS(m.titulo) && !temRS(m.texto)) return m;
+  const partes = String(m.texto ?? '').split(' · ').filter((p) => !temRS(p));
+  let texto = partes.join(' · ').replace(RS, 'valor restrito');
+  if (!texto.trim()) texto = 'Valores visíveis só para administradores.';
+  return { ...m, titulo: m.titulo.replace(RS, 'valor restrito'), texto };
+}
+async function veReceita(org: string, userId: string): Promise<boolean> {
+  const { data, error } = await adminClient().rpc('usuario_ve_receita', { p_org: org, p_app_user: userId });
+  if (error) { console.warn('[notify] usuario_ve_receita falhou; enviando sem valores', error.message); return false; }
+  return data === true;
+}
 
 const APP_URL = () => env('APP_URL') ?? '';
 const linkAbs = (l?: string) => (l && l.startsWith('#') && APP_URL() ? `${APP_URL().replace(/\/$/, '')}/${l}` : l ?? '');
@@ -98,6 +114,7 @@ export async function enviarParaUsuario(org: string, userId: string, canais: Can
   const prefsRec = await obter(org, 'settings', `notif:${userId}`);
   const prefs = ((prefsRec?.valor as Prefs) ?? {}) as Prefs;
   const t = u.teamId ? await obter(org, 'team', String(u.teamId)) as (Obj & { telefone?: string }) | null : null;
+  if (!m.semRedigir && (temRS(m.titulo) || temRS(m.texto)) && !(await veReceita(org, userId))) m = redigir(m);
   const silencio = emSilencio(prefs) && !(m.prioridade === 'alta' && prefs.silencio?.furarAlta !== false);
   for (const c of canais) {
     if (c === 'app') continue; // a notificação in-app já é o registro em `notifications`

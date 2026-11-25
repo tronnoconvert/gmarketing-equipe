@@ -1,6 +1,7 @@
 // build.mjs — empacota o app:
 //  (a) dist/index.html + dist/app.js + dist/app.css + cópia de public/ (hospedagem estática)
-//  (b) dist/agencia-os.html — arquivo único com JS e CSS embutidos (prévia)
+//  (b) dist/agencia-os.html — arquivo único com JS e CSS embutidos (prévia; sempre modo demonstração)
+// Produção: `npm run build` usa public/config.js (Supabase). Demonstração: `AOS_DEMO=1 npm run build`.
 import * as esbuild from 'esbuild';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -36,7 +37,9 @@ const copiar = (a, b) => {
   }
 };
 copiar(PUB, DIST);
-if (!fs.existsSync(path.join(DIST, 'config.js'))) fs.writeFileSync(path.join(DIST, 'config.js'), 'window.AOS_CONFIG = window.AOS_CONFIG || {};\n');
+// public/config.js = produção (Supabase). AOS_DEMO=1 (testes, prévias) publica um config vazio → modo demonstração.
+const DEMO = process.env.AOS_DEMO === '1';
+if (DEMO || !fs.existsSync(path.join(DIST, 'config.js'))) fs.writeFileSync(path.join(DIST, 'config.js'), '// modo demonstração (build com AOS_DEMO=1)\nwindow.AOS_CONFIG = window.AOS_CONFIG || {};\n');
 
 // HTML
 const html = fs.readFileSync(path.join(SRC, 'index.html'), 'utf8');
@@ -51,4 +54,4 @@ const single = html
 fs.writeFileSync(path.join(DIST, 'agencia-os.html'), single.replace('<title>Gmarketing</title>', '<title>Protótipo Oficial</title>'));
 
 const kb = f => (fs.statSync(path.join(DIST, f)).size / 1024).toFixed(0) + ' KB';
-console.log(`build ok em ${Date.now() - t0} ms · app.js ${kb('app.js')} · app.css ${kb('app.css')} (${cssMods.length} css de módulos) · agencia-os.html ${kb('agencia-os.html')}`);
+console.log(`build ${DEMO ? 'DEMONSTRAÇÃO' : 'PRODUÇÃO (public/config.js)'} ok em ${Date.now() - t0} ms · app.js ${kb('app.js')} · app.css ${kb('app.css')} (${cssMods.length} css de módulos) · agencia-os.html ${kb('agencia-os.html')}`);
