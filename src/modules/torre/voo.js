@@ -147,7 +147,7 @@ ${ui.kpi({ rotulo: 'Pedindo ação', valor: String(nAt), alerta: nAt > 0, href: 
   });
   const busca = `<label class="m-voo-busca">${ui.ic('search')}<input type="search" data-voo-q placeholder="Buscar cliente ou conta" aria-label="Buscar cliente ou conta"></label>`;
   const contasCard = ui.card({ titulo: 'Contas', sub: `${lista.length} de ${todas.length}`, cls: 'm-voo-contas', pad: false, acoes: busca,
-    corpo: `<div class="m-voo-chips">${ui.chips(filtros, f, 'f', { rotulo: 'Filtrar contas' })}</div>${tabela}` });
+    corpo: `<div class="m-voo-chips">${ui.chips(filtros, f, 'f', { rotulo: 'Filtrar contas', primeiroLimpa: false })}</div>${tabela}` });
   const vinc = vinculaveis.length ? cardVincular(ctx, vinculaveis) : '';
   const nota = `<p class="m-voo-nota">${ui.ic('info')}<span>${AVISO_4G} ${AVISO_ATRASO}</span></p>`;
   const avisoAcoes = !F.acoesConfiguradas() && ctx.can('torre_voo', 'editar') && !auth.vendoComo() ? ui.aviso({ tipo: 'info', titulo: 'Leitura liberada; ações no Meta ainda não', texto: `${SEM_TOKEN} Até lá, os botões de pausar e orçamento ficam desligados.` }) : '';

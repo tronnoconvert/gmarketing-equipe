@@ -1,6 +1,7 @@
 // tests/live/voo.mjs — Painel de Voo (item 17) CONTRA O SUPABASE DE PRODUÇÃO (não faz parte de `npm test`).
 // Cria 2 logins temporários (dono de teste e gestor de teste, domínio .invalid) e 1 cliente de teste ligado a UMA conta
-// real do cache, chama as Edge Functions voo-dados e voo-acao e confere: escopo por papel, receita removida para o gestor,
+// real do cache (+1 cliente de OUTRO responsável ligado a outra conta), chama as Edge Functions voo-dados e voo-acao e confere:
+// gestor vê todas as contas VINCULADAS (cobre colega; decisão de 25/11/2026) mas não as sem cliente, receita removida para o gestor,
 // busca ao vivo + intervalo mínimo de 20 s, conta fora do escopo recusada, SIM obrigatório, só pausar/orçamento, "ver como"
 // recusado e "não configurado" sem META_ACCESS_TOKEN. No fim APAGA só o que criou. Imprime apenas contagens (nunca nomes).
 // Uso: SQL_CMD=/caminho/q.sh NODE_USE_ENV_PROXY=1 NODE_EXTRA_CA_CERTS=... node tests/live/voo.mjs
@@ -66,7 +67,9 @@ async function telaProducao(u, conta) {
     await page.goto(raiz); await page.waitForSelector('#lg-email', { timeout: 30000 });
     await page.fill('#lg-email', u.email); await page.fill('#lg-senha', SENHA); await page.click('.lg-go'); await page.waitForSelector('#view', { timeout: 30000 });
     await page.goto(`${raiz}#/torre/voo`); await page.waitForSelector('.m-voo-contas tbody tr', { timeout: 60000 });
-    ok((await page.$$('.m-voo-contas tbody tr')).length === 1, 'tela: gestor vê 1 conta (a do cliente dele)');
+    ok((await page.$$('.m-voo-contas tbody tr')).length === 1, 'tela: gestor abre em "Meus clientes" (1 conta, a do cliente dele)');
+    await page.goto(`${raiz}#/torre/voo?f=todas`); await page.waitForTimeout(800); await page.waitForSelector('.m-voo-contas tbody tr', { timeout: 60000 });
+    ok((await page.$$('.m-voo-contas tbody tr')).length >= 2, `tela: "Todas" mostra as contas dos outros clientes (${(await page.$$('.m-voo-contas tbody tr')).length})`);
     await page.goto(`${raiz}#/torre/voo/${conta}`); await page.waitForSelector(`[data-voo-conta="${conta}"]`, { timeout: 60000 });
     ok(/atualizado agora/.test(await page.textContent('.ph')), 'tela: detalhe buscado ao vivo ("atualizado agora")');
     ok(!/Faturamento/.test(await page.textContent('#view')), 'tela: sem faturamento para o gestor');
@@ -79,8 +82,8 @@ async function telaProducao(u, conta) {
   } finally { await browser.close(); srv.close(); }
 }
 function limpar() {
-  sql(`delete from public.records where id in ('clients:c-voo-teste') or id like 'users:u-voo-%' or id like 'team:t-voo-%' or (col in ('activity','clientActions') and (data->>'quem' like 'u-voo-%' or data->>'quem' like 't-voo-%' or data->>'clientId' = 'c-voo-teste'));
-       delete from public.records_feed where rec_id like 'users:u-voo-%' or rec_id like 'team:t-voo-%' or rec_id = 'clients:c-voo-teste' or rec_id like 'activity:%' and em > now() - interval '1 hour' and rec_id not in (select id from public.records);
+  sql(`delete from public.records where id in ('clients:c-voo-teste', 'clients:c-voo-teste2') or id like 'users:u-voo-%' or id like 'team:t-voo-%' or (col in ('activity','clientActions') and (data->>'quem' like 'u-voo-%' or data->>'quem' like 't-voo-%' or data->>'clientId' in ('c-voo-teste', 'c-voo-teste2')));
+       delete from public.records_feed where rec_id like 'users:u-voo-%' or rec_id like 'team:t-voo-%' or rec_id in ('clients:c-voo-teste', 'clients:c-voo-teste2') or rec_id like 'activity:%' and em > now() - interval '1 hour' and rec_id not in (select id from public.records);
        delete from public.voo_mudancas where user_id in (select id from auth.users where email like '%${DOM}');
        delete from auth.users where email like '%${DOM}';`);
   sql(`delete from public.voo_cache where chave like 'vivo:%' and split_part(chave, ':', 2) not in (select id::text from auth.users)`);
@@ -97,7 +100,8 @@ try {
   const contaTeste = Object.values(dia.estr.camps)[0].c;
   const outra = [contas.a, contas.b].find(x => x !== contaTeste);
   sql(`insert into public.records (id, col, data, org_id) values ('clients:c-voo-teste', 'clients', '${esc(JSON.stringify({ id: 'c-voo-teste', nome: 'Cliente de teste (Painel de Voo)', respId: gestor.team, equipe: [gestor.team], ativo: true, metaContas: [contaTeste], metaCustoConversa: 15 }))}'::jsonb, 'gmarketing')`);
-  ok(true, `2 logins temporários e 1 cliente de teste (contas ativas no cache: ${contas.n})`);
+  sql(`insert into public.records (id, col, data, org_id) values ('clients:c-voo-teste2', 'clients', '${esc(JSON.stringify({ id: 'c-voo-teste2', nome: 'Cliente de teste 2 (Painel de Voo)', respId: dono.team, equipe: [dono.team], ativo: true, metaContas: [outra] }))}'::jsonb, 'gmarketing')`);
+  ok(true, `2 logins temporários e 2 clientes de teste (contas ativas no cache: ${contas.n})`);
   const tDono = await entrar(dono), tGestor = await entrar(gestor);
 
   console.log('▶ voo-dados: escopo e receita');
@@ -109,9 +113,13 @@ try {
   ok(gD.j.linhas.length > 0 && gD.j.dias.length === 15, `pacote com ${gD.j.linhas.length} linhas e 15 dias`);
   ok(!!gD.j.atualizadoEm && Date.now() - Date.parse(gD.j.atualizadoEm) < 20 * 60000, `cache recente (${Math.round((Date.now() - Date.parse(gD.j.atualizadoEm)) / 60000)} min)`);
   const gG = await fn('voo-dados', tGestor, { acao: 'ler' });
-  ok(gG.status === 200 && gG.j.contas.length === 1 && gG.j.contas[0].id === contaTeste && gG.j.contas[0].clientId === 'c-voo-teste', `gestor: só a conta do cliente dele (${gG.j.contas.length})`);
-  ok(gG.j.veReceita === false && gG.j.linhas.every(l => l[10] == null) && gG.j.escopo === 'seus', 'gestor: sem receita (action_values_purchase removido no servidor)');
-  ok(Object.values(gG.j.camps).every(c => c.c === contaTeste), 'gestor: nenhuma campanha de outra conta');
+  const vincDono = gD.j.contas.filter(c => c.clientId).map(c => c.id).sort();
+  const semCli = gD.j.contas.find(c => !c.clientId && c.id !== contaTeste && c.id !== outra);
+  ok(gG.status === 200 && gG.j.contas.length === vincDono.length && gG.j.contas.map(c => c.id).sort().join() === vincDono.join() && gG.j.contas.some(c => c.id === outra && c.clientId === 'c-voo-teste2'), `gestor: todas as contas vinculadas a clientes, inclusive de outro responsável (${gG.j.contas.length})`);
+  ok(gG.j.contas.every(c => c.clientId), 'gestor: nenhuma conta sem cliente vinculado');
+  ok((gG.j.meus || []).includes('c-voo-teste') && !(gG.j.meus || []).includes('c-voo-teste2'), 'gestor: "meus clientes" informado para o filtro padrão');
+  ok(gG.j.veReceita === false && gG.j.linhas.length > 0 && gG.j.linhas.every(l => l[10] == null) && gG.j.escopo === 'todos', 'gestor: sem receita (action_values_purchase removido no servidor)');
+  const vinc = new Set(vincDono); ok(Object.values(gG.j.camps).every(c => vinc.has(String(c.c))), 'gestor: nenhuma campanha de conta sem cliente');
 
   console.log('▶ voo-dados: detalhe ao vivo');
   const t0 = Date.now(); const v1 = await fn('voo-dados', tGestor, { acao: 'conta', conta: contaTeste });
@@ -120,7 +128,8 @@ try {
   const v2 = await fn('voo-dados', tGestor, { acao: 'conta', conta: contaTeste });
   ok(v2.status === 200 && v2.j.fonte === 'recente', `nova busca em menos de 20 s usa o resultado recente (${v2.j.fonte})`);
   const v3 = await fn('voo-dados', tGestor, { acao: 'conta', conta: outra });
-  ok(v3.status === 403, `gestor não busca conta de outro cliente (${v3.status})`);
+  ok(v3.status === 200, `gestor busca ao vivo conta de cliente de outro responsável (${v3.status})`);
+  if (semCli) { const v4 = await fn('voo-dados', tGestor, { acao: 'conta', conta: semCli.id }); ok(v4.status === 403, `gestor não busca conta sem cliente vinculado (${v4.status})`); }
 
   console.log('▶ voo-acao: regras no servidor');
   const base = { nivel: 'anuncio', id: '1234567890', conta: contaTeste };
@@ -132,23 +141,26 @@ try {
   ok(a3.status === 400 && a3.j.codigo === 'acao_proibida', 'excluir/reativar não existem (só pausar e orçamento)');
   const a4 = await fn('voo-acao', tGestor, { acao: 'pausar', ...base, confirmacao: 'SIM', vendoComo: true });
   ok(a4.status === 403 && a4.j.codigo === 'ver_como', '"ver como" recusado');
-  const a5 = await fn('voo-acao', tGestor, { acao: 'pausar', ...base, conta: outra, confirmacao: 'SIM' });
-  ok(a5.status === 403, `conta fora do escopo recusada (${a5.status})`);
+  if (semCli) { const a5 = await fn('voo-acao', tGestor, { acao: 'pausar', ...base, conta: semCli.id, confirmacao: 'SIM' }); ok(a5.status === 403, `conta sem cliente vinculado recusada para o gestor (${a5.status})`); }
+  const a5b = await fn('voo-acao', tGestor, { acao: 'pausar', ...base, conta: outra, confirmacao: 'SIM' });
+  ok(a5b.status !== 403, `gestor passa do escopo na conta de cliente de outro responsável (${a5b.status} ${a5b.j && a5b.j.codigo})`);
   const a6 = await fn('voo-acao', tGestor, { acao: 'pausar', ...base, confirmacao: 'SIM' });
   ok(a6.status === 503 && a6.j.codigo === 'nao_configurado', `sem META_ACCESS_TOKEN → 503 "não configurado" (${a6.status})`);
   const st = await fn('voo-acao', tDono, { acao: 'status' });
   ok(st.status === 200 && st.j.configurado === false, 'status: ações aguardando o token');
 
-  console.log('▶ limite de 4 mudanças de orçamento por conjunto por hora (banco)');
-  const r = sql(`select public.voo_reservar_mudanca('gmarketing','voo-teste-obj','x',null,1,2,4) a, public.voo_reservar_mudanca('gmarketing','voo-teste-obj','x',null,1,2,4) b, public.voo_reservar_mudanca('gmarketing','voo-teste-obj','x',null,1,2,4) c, public.voo_reservar_mudanca('gmarketing','voo-teste-obj','x',null,1,2,4) d, public.voo_reservar_mudanca('gmarketing','voo-teste-obj','x',null,1,2,4) e`)[0];
-  ok(r.a > 0 && r.d > 0 && r.e === -1, '4 reservas aceitas, a 5ª recusada');
+  console.log('▶ limite de 10 mudanças de orçamento por conjunto por hora (banco)');
+  const res = []; for (let k = 0; k < 11; k++) res.push(Number(sql(`select public.voo_reservar_mudanca('gmarketing','voo-teste-obj','x',null,1,2,10) r`)[0].r));
+  ok(res.slice(0, 10).every(x => x > 0) && res[10] === -1, `10 reservas aceitas, a 11ª recusada (${res.filter(x => x > 0).length})`);
+  const acima = Number(sql(`select public.voo_reservar_mudanca('gmarketing','voo-teste-obj','x',null,1,2,50) r`)[0].r);
+  ok(acima === -1, 'limite pedido acima de 10 continua travado em 10');
   sql(`delete from public.voo_mudancas where objeto_id = 'voo-teste-obj'`);
   if (process.env.OUT && process.env.SUPABASE_ESM_FILE) await telaProducao(gestor, contaTeste);
   const priv = await fetch(`${URL_SB}/rest/v1/voo_cache?select=chave&limit=1`, { headers: { apikey: ANON, Authorization: `Bearer ${tDono}` } });
   ok(priv.status === 401 || priv.status === 403 || (priv.ok && (await priv.json()).length === 0), `tabela voo_cache fechada para o navegador (${priv.status})`);
 } catch (e) { falhas++; console.log(`  ✗ erro: ${e.message}`); }
 finally {
-  try { limpar(); const n = sql(`select (select count(*) from auth.users where email like '%${DOM}') u, (select count(*) from public.records where id = 'clients:c-voo-teste') c`)[0]; ok(Number(n.u) === 0 && Number(n.c) === 0, 'limpeza: logins e cliente de teste apagados'); } catch (e) { falhas++; console.log(`  ✗ limpeza: ${e.message}`); }
+  try { limpar(); const n = sql(`select (select count(*) from auth.users where email like '%${DOM}') u, (select count(*) from public.records where id in ('clients:c-voo-teste', 'clients:c-voo-teste2')) c`)[0]; ok(Number(n.u) === 0 && Number(n.c) === 0, 'limpeza: logins e cliente de teste apagados'); } catch (e) { falhas++; console.log(`  ✗ limpeza: ${e.message}`); }
 }
 console.log(`\n${oks} ok · ${falhas} falha(s)`);
 process.exit(falhas ? 1 : 0);

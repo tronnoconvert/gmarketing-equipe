@@ -11,7 +11,7 @@ export function renderLista(ctx) {
   const { ui, charts, fmt, db, query } = ctx;
   const todos = K.visiveis();
   const k = K.kpis(todos);
-  const f = K.FILTROS.find(x => x.id === query.f) || K.FILTROS[0];
+  const f = K.filtroAtual(query.f);
   const q = fmt.norm(query.q || '').trim();
   let linhas = todos.filter(f.fn);
   if (q) linhas = linhas.filter(c => fmt.norm(`${c.nome} ${c.razaoSocial} ${c.segmento} ${(c.servicos || []).join(' ')} ${c.cnpj}`).includes(q) || (q.replace(/\D/g, '').length >= 4 && String(c.cnpj).replace(/\D/g, '').includes(q.replace(/\D/g, ''))));
@@ -52,7 +52,7 @@ ${D ? ui.kpi({ rotulo: 'Churn 12 meses', valor: fmt.pct(CARTEIRA_REF.churn12m), 
   });
 
   // carteira
-  const chips = ui.chips(K.FILTROS.map(x => ({ id: x.id, rotulo: x.rotulo, n: todos.filter(x.fn).length, estado: x.estado })), f.id, 'f', { rotulo: 'Filtrar carteira' });
+  const chips = ui.chips(K.filtros().map(x => ({ id: x.id, rotulo: x.rotulo, n: todos.filter(x.fn).length, estado: x.estado })), f.id, 'f', { rotulo: 'Filtrar carteira', primeiroLimpa: false });
   const tabela = ui.tabela({
     cols: [
       { k: 'nome', l: 'Cliente', r: c => `<div class="m-clientes-cl">${logo(c, 28)}<div class="m-clientes-cln"><b class="trunc">${fmt.esc(c.nome)}</b><span class="sub">${fmt.esc(c.segmento)}${c.status === 'onboarding' ? ' · em onboarding' : ''}</span></div></div>` },
@@ -135,7 +135,7 @@ export function mountLista(el, ctx) {
     if (sg) { router.setQuery({ m: sg.dataset.seg === 'todos' ? 'todos' : null }, { render: true }); return; }
     if (e.target.closest('[data-importar]')) { if (ctx.can('clientes', 'editar')) importarClientes(ctx); return; }
     if (e.target.closest('[data-csv]')) {
-      const todos = K.visiveis(); const f = K.FILTROS.find(x => x.id === ctx.query.f) || K.FILTROS[0];
+      const todos = K.visiveis(); const f = K.filtroAtual(ctx.query.f);
       const q = fmt.norm(ctx.query.q || '');
       const l = todos.filter(f.fn).filter(c => !q || fmt.norm(`${c.nome} ${c.razaoSocial} ${c.segmento} ${c.cnpj}`).includes(q)).sort((a, b) => (K.veReceita() ? b.mrr - a.mrr : a.health - b.health));
       const blob = new Blob([K.csv(l)], { type: 'text/csv;charset=utf-8' });

@@ -2,6 +2,7 @@
 import { db } from '../../core/store.js';
 import * as fmt from '../../core/fmt.js';
 import { perms } from '../../core/perms.js';
+import { auth } from '../../core/auth.js';
 import { padrao } from '../../core/padroes/index.js';
 import { HOJE, PESOS, COMP_META, PENALIDADE_QUEDA, SEMANAS, NSEM, TIPOS_ACAO, ETAPAS_ONB } from './data.js';
 
@@ -44,6 +45,12 @@ export const FILTROS = [
   { id: 'inadimplentes', rotulo: 'Inadimplentes', fn: inadimplente },
   { id: 'renovam', get rotulo() { return `Renovam em ${janelaRenova()} dias`; }, fn: renovaEm30 },
 ];
+
+// gestor de tráfego vê todos os clientes (cobre colega ausente), mas a carteira abre em "Meus clientes" (decisão do dono, 25/11/2026)
+const ehGestorTrafego = () => (auth.user() || {}).papel === 'gestor_trafego';
+const FILTRO_MEUS = { id: 'meus', rotulo: 'Meus clientes', fn: c => perms.meusClientes().includes(c.id) };
+export const filtros = () => (ehGestorTrafego() ? [FILTROS[0], FILTRO_MEUS, ...FILTROS.slice(1)] : FILTROS);
+export const filtroAtual = f => filtros().find(x => x.id === f) || (ehGestorTrafego() && perms.meusClientes().length ? FILTRO_MEUS : FILTROS[0]);
 
 /* ---------- KPIs da carteira ---------- */
 export function kpis(lista) {

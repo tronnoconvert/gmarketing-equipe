@@ -226,7 +226,7 @@ Em outro projeto: edite os 3 valores no topo de `supabase/cron.sql` e rode no SQ
   edição preservando o MRR, realtime, notificações) — 35 verificações, e o teste apagou tudo no final.
 - **Funções do servidor:** publicadas e respondendo (401 sem sessão; "não configurado" sem chave de provedor). As chamadas
   reais ao Windsor, monday.com, WhatsApp e e-mail só podem ser testadas com as chaves de vocês.
-- **Regras de segurança:** `supabase/tests/rls_test.sql` — 92 verificações num PostgreSQL 16 local.
+- **Regras de segurança:** `supabase/tests/rls_test.sql` — 95 verificações num PostgreSQL 16 local.
 - **Alertas essenciais e catálogo de rotinas:** a produção começa vazia (os 7 alertas e as rotinas do modo demonstração
   usam pessoas fictícias). Cadastre as regras em Alertas depois que a equipe existir.
 - **Conta da tela Campanha:** informe o ID da conta de anúncios (formato `act_...`) em Campanha › Conexão depois de configurar o `WINDSOR_API_KEY`.
