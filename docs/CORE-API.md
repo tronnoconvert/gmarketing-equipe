@@ -52,7 +52,9 @@ db.on((col, op, obj) => …) -> unsubscribe   // op: insert|update|remove|batch|
 db.batch(() => { … })                       // várias escritas, um evento
 db.config(chave, padrao) · db.setConfig(chave, valor)   // coleção settings {id: chave, valor}
 db.mode 'demo'|'supabase' · db.reset() (demo: apaga e ressemeia, recarrega)
+db.dadosDemo                                 // true SÓ quando há dados de exemplo (modo demonstração). Ver abaixo.
 ```
+- **Dados de exemplo × produção (`db.dadosDemo`)**: sementes (`db.seed`) e snapshots/constantes de demonstração (ex.: `cockpit/data.js`, séries de `financeiro/data.js`, `HISTORICO` do Comercial, `CLIENTES_BASE`/`FATURAVEIS` da Operação) só valem com `db.dadosDemo === true`. Produção (Supabase com `seedDemo:false`) → `false`: o módulo calcula das coleções reais e, sem dado, mostra estado vazio que ensina o próximo passo — **nunca** número fictício. Teste "produção vazia": build demo + `AOS_CONFIG.seedDemo = false` (LocalAdapter sem sementes, chave `aos-db-v1-vazio`) — `tests/producao-vazia.spec.mjs`. Não use `db.mode` para isso (`db.mode` diz só se há servidor).
 - `insert` gera `id` (`cli-…`), `createdAt` (ISO), `createdBy` (usuário real). `update` grava `updatedAt/updatedBy`. `insert` com id existente substitui (use para **Desfazer** um `remove`).
 - `{log: 'alterou MRR'}` grava em `activity` `{quem, quemNome, oque, col, refId, quando}`.
 - Coleções: `users, team, clients, contacts, contracts, services, healthHistory, deliveries, tasks, invoices, payables, cash, deals, routines, routineRuns, integrations, alerts, alertRules, notifications, comments, activity, webinars, campaignAccount, campaignDaily, campaigns, onboarding, meetings, timeEntries, goals, settings` (+ coleções de módulos; `relatorios` = relatório semanal do gestor de tráfego `{id, clientId, semana:'2026-W48', enviadoPor, quando}`).

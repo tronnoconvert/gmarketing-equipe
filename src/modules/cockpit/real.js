@@ -61,7 +61,7 @@ function saude(ctx) {
   ];
   const com = comp.filter(c => c.v != null);
   const ajuda = 'Média ponderada dos componentes com dado: Clientes (health médio), Operação (entregas no prazo) e Equipe (ocupação na zona ideal). Faixas: ≥75 ok · 60–74 atenção · <60 crítico.';
-  if (!com.length) return ui.card({ titulo: 'Saúde da agência', cls: 'ck-saude', ajuda, corpo: vz(ui, { icone: 'gauge', titulo: 'Ainda sem dados para medir', texto: 'A saúde da agência combina o health score dos clientes, as entregas no prazo e a ocupação da equipe. Cadastre clientes e registre entregas para ver o índice.', acao: { rotulo: 'Cadastrar cliente', href: '#/clientes/novo', icone: 'plus' } }) });
+  if (!com.length) return ui.card({ titulo: 'Saúde da agência', cls: 'ck-saude', ajuda, corpo: vz(ui, { icone: 'gauge', titulo: 'Ainda sem dados para medir', texto: 'Combina o health dos clientes, as entregas no prazo e a ocupação da equipe.', acao: { rotulo: 'Cadastrar cliente', href: '#/clientes/novo', icone: 'plus' } }) });
   const peso = com.reduce((a, c) => a + c.peso, 0); const score = Math.round(com.reduce((a, c) => a + c.v * c.peso, 0) / peso);
   return ui.card({ titulo: 'Saúde da agência', cls: 'ck-saude', ajuda,
     corpo: `${charts.gauge(score, { rotulo: 'Saúde da agência', sub: com.length < comp.length ? `com ${com.length} de ${comp.length} componentes` : 'todos os componentes', tamanho: 190 })}
