@@ -3,6 +3,8 @@ import { db } from './store.js';
 import { esc } from './fmt.js';
 import { svgIc } from './icons.js';
 import { toast, avatar } from './ui.js';
+import { iniciarCenaLogin } from './login-fx.js';
+import { fraseDoDia } from './frases.js';
 
 const SKEY = 'aos-sessao';
 const CFG = (typeof window !== 'undefined' && window.AOS_CONFIG) || {};
@@ -136,30 +138,47 @@ export const auth = {
     const demo = this.demo;
     const rapidos = [['Dono', 'gabriel', 'Gabriel Leão'], ['Head de tráfego', 'allan', 'Allan Vieira'], ['Gestor de tráfego', 'ana', 'Ana Souza'], ['CS', 'diego', 'Diego Melo'], ['Produção', 'carla', 'Carla Dias'], ['Financeiro', 'paulo', 'Paulo Reis']];
     const outros = [['Administrador', 'rayane', 'Rayane Leão'], ['Comercial', 'marina', 'Marina Costa'], ['Somente leitura', 'helena', 'Helena Prado']];
+    const fr = fraseDoDia();
+    const frase = cls => `<figure class="lg-frase ${cls}"><span class="lg-frase-k">${fr.tipo === 'biblia' ? 'Versículo do dia' : 'Frase do dia'}</span><blockquote>“${esc(fr.texto)}”</blockquote><figcaption>— ${esc(fr.autor)}</figcaption></figure>`;
     const btnR = ([rot, k, nome]) => {
       const u = db.get('users', `u-${k}`) || { nome, avatarCor: '#64748B' };
       return `<button type="button" class="lg-q" data-quick="${k}@agencia.demo">${avatar(u, 28)}<span><b>Entrar como ${esc(rot)}</b><small>${esc(nome)}</small></span>${svgIc('arrow-right')}</button>`;
     };
     root.innerHTML = `
 <div class="lg lgn">
+  <canvas class="lg-fx" aria-hidden="true"></canvas>
+  <div class="lg-aurora" aria-hidden="true"><i></i><i></i><i></i></div>
+  <div class="lg-spot" aria-hidden="true"></div>
   <section class="lg-side" aria-hidden="true">
-    <div class="lg-brand"><span class="brand-mk brand-g" aria-hidden="true">G</span><b>Gmarketing</b></div>
+    <div class="lg-brand"><span class="brand-mk brand-g" aria-hidden="true">G</span><b>Gmarketing</b><span class="lg-live"><i></i>Sistemas no ar</span></div>
     <div class="lg-pitch">
-      <h2>O painel de controle da sua agência.</h2>
-      <p>Receita, clientes, operação, equipe e tráfego em um só lugar — com luzes que mostram o que precisa de você hoje.</p>
-      <ul class="lg-feat">
-        <li><span class="led-w"><i class="led ok"></i>Rotinas e integrações operando</span></li>
-        <li><span class="led-w"><i class="led warn"></i>Renovações e entregas que pedem atenção</span></li>
-        <li><span class="led-w"><i class="led err"></i>Falhas e clientes em risco, antes de virarem churn</span></li>
-      </ul>
+      <span class="lg-eyebrow">Central de comando da agência</span>
+      <h2>Onde a performance <em>decola.</em></h2>
+      <p>Tráfego, clientes, operação e equipe na mesma cabine — com o motor de recomendações e o Guardião vigiando cada conta, 24 horas por dia.</p>
     </div>
+    <div class="lg-stage">
+      <div class="lg-fl lg-fl-a" data-prof="26">
+        <div class="lg-fl-h"><span>Painel de Voo</span><i class="lg-dot ok"></i></div>
+        <svg viewBox="0 0 220 64" class="lg-spark" preserveAspectRatio="none"><defs><linearGradient id="lgsg" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#3D9BFF" stop-opacity=".45"/><stop offset="1" stop-color="#3D9BFF" stop-opacity="0"/></linearGradient></defs><path d="M0 50 L20 44 L40 47 L60 36 L80 39 L100 28 L120 31 L140 20 L160 24 L180 12 L200 15 L220 6 L220 64 L0 64Z" fill="url(#lgsg)"/><path class="lg-spark-l" d="M0 50 L20 44 L40 47 L60 36 L80 39 L100 28 L120 31 L140 20 L160 24 L180 12 L200 15 L220 6" fill="none" stroke="#5AB4FF" stroke-width="2" stroke-linejoin="round"/></svg>
+        <div class="lg-fl-f"><b>Contas Meta</b><span>monitoradas em tempo real</span></div>
+      </div>
+      <div class="lg-fl lg-fl-b" data-prof="44">
+        <div class="lg-fl-h"><span>Guardião</span><i class="lg-dot ok"></i></div>
+        <div class="lg-shield">${svgIc('check')}<span>Nenhuma invasão<br><small>vigilância ativa</small></span></div>
+      </div>
+      <div class="lg-fl lg-fl-c" data-prof="16">
+        <div class="lg-fl-h"><span>Motor de recomendações</span></div>
+        <div class="lg-bars"><i style="--h:42%"></i><i style="--h:64%"></i><i style="--h:51%"></i><i style="--h:78%"></i><i style="--h:69%"></i><i style="--h:92%"></i><i style="--h:84%"></i></div>
+      </div>
+    </div>
+    ${frase('lg-frase-d')}
     <small class="lg-foot">${demo ? 'Dados ilustrativos no modo demonstração.' : 'Acesso restrito à equipe Gmarketing.'}</small>
   </section>
   <main class="lg-main">
-    <div class="lg-card">
+    <div class="lg-card"><span class="lg-card-glow" aria-hidden="true"></span>
       <div class="lg-brand lg-brand-m"><span class="brand-mk brand-g" aria-hidden="true">G</span><b>Gmarketing</b></div>
-      <h1>Entrar</h1>
-      <p class="lg-sub">Use seu e-mail de trabalho e senha.</p>
+      <h1>Bem-vindo de volta</h1>
+      <p class="lg-sub">Entre com seu e-mail de trabalho para assumir o comando.</p>
       <form class="lg-form" novalidate>
         <div class="fld"><label for="lg-email">E-mail</label><input id="lg-email" name="email" type="email" autocomplete="username" inputmode="email" placeholder="nome@agencia.com.br" required></div>
         <div class="fld"><div class="fld-top"><label for="lg-senha">Senha</label><button type="button" class="lnk" data-esqueci>Esqueci minha senha</button></div>
@@ -173,6 +192,7 @@ export const auth = {
         <details class="lg-more"><summary>Outros papéis</summary><div class="lg-qs">${outros.map(btnR).join('')}</div></details>
       </div>` : ''}
     </div>
+    ${frase('lg-frase-m')}
   </main>
 </div>`;
     const f = root.querySelector('form'), err = root.querySelector('.lg-err'), go = root.querySelector('.lg-go');
@@ -197,13 +217,15 @@ export const auth = {
       mostrar('');
       toast(r.msg, { tipo: 'info', duracao: 9000 });
     });
+    if (this._pararCena) this._pararCena();
+    this._pararCena = iniciarCenaLogin(root);
     setTimeout(() => { if (!f.contains(document.activeElement)) f.email.focus(); }, 30);
   },
 
   /** produção: "Crie sua nova senha" (obrigatória no 1º acesso com senha provisória) */
   renderTrocaSenha(root, user, onOk) {
     const card = root.querySelector('.lg-card');
-    card.innerHTML = `
+    card.innerHTML = `<span class="lg-card-glow" aria-hidden="true"></span>
       <div class="lg-brand lg-brand-m"><span class="brand-mk brand-g" aria-hidden="true">G</span><b>Gmarketing</b></div>
       <h1>Crie sua nova senha</h1>
       <p class="lg-sub">Olá${user && user.nome ? `, ${esc(String(user.nome).split(' ')[0])}` : ''}! Você entrou com uma senha provisória. Antes de continuar, crie a sua senha pessoal — só você vai saber.</p>
