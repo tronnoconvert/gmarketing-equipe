@@ -939,3 +939,11 @@ html.sb-fechado .sb-tg .ic{transform:rotate(180deg)}
 .lg-main{grid-auto-flow:row;align-content:center;gap:18px}
 @media (max-width:900px){.lg-frase-m{display:block;width:min(430px,100%)}.lg-frase-m blockquote{font-size:14.5px}}
 @media (max-height:820px) and (min-width:901px){.lg-stage{display:none}}
+/* login · marca grande */
+.lgn .lg-brand{gap:14px}
+.lgn .lg-brand .brand-mk{width:52px;height:52px;border-radius:15px}
+.lgn .lg-brand .brand-g{font-size:30px;font-weight:800}
+.lgn .lg-brand b{font-size:30px;font-weight:800;letter-spacing:-.035em}
+.lgn .lg-brand-m .brand-mk{width:44px;height:44px;border-radius:13px}
+.lgn .lg-brand-m .brand-g{font-size:25px}
+.lgn .lg-brand-m b{font-size:25px}
