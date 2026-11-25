@@ -129,6 +129,8 @@ export function luzMestra() {
   if (errA) return { estado: 'err', texto: plural(errA, 'alerta crítico', 'alertas críticos') };
   if (errT) return { estado: 'err', texto: `${errT} ${errT === 1 ? 'falha' : 'falhas'} na Torre` };
   if (warn) return { estado: 'warn', texto: `${warn} ${warn === 1 ? 'ponto' : 'pontos'} de atenção` };
+  // sem rotina nem integração ativa não há o que estar "operando": estado neutro em vez de um "tudo ok" falso
+  if (!torre.length) return { estado: 'off', texto: 'Sem rotinas configuradas' };
   return { estado: 'ok', texto: 'Tudo operando' };
 }
 
@@ -505,7 +507,7 @@ ${it(tema() === 'escuro' ? 'sun' : 'moon', tema() === 'escuro' ? 'Tema claro' : 
 <button type="button" role="menuitem" class="pm-i" data-paleta>${svgIc('zap')}<span>Paleta de comandos</span><kbd class="pm-k" aria-hidden="true">${esc(teclaPaleta())}</kbd></button>
 ${it('keyboard', 'Atalhos de teclado', ' data-atalhos')}
 <div class="pm-sep" role="separator"></div>
-${it('log-out', 'Sair', ' data-sair')}</div>${db.mode === 'demo' ? '<p class="pm-demo">Modo demonstração · dados ilustrativos</p>' : ''}`;
+${it('log-out', 'Sair', ' data-sair')}</div>${db.dadosDemo ? '<p class="pm-demo">Modo demonstração · dados ilustrativos</p>' : ''}`;
   perfilPop = popover(anc, html, { cls: 'pm', role: 'presentation', largura: 280, onFechar: () => { perfilPop = null; } });
   perfilPop.el.addEventListener('click', e => { const b = e.target.closest('a,button'); if (b && !b.hasAttribute('data-densidade-toggle')) setTimeout(() => perfilPop && perfilPop.fechar(), 0); });
   const f = perfilPop.el.querySelector('[role=menuitem]'); f && f.focus();

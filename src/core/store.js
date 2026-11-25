@@ -1,8 +1,7 @@
 // store.js — banco de dados do app. Leituras síncronas da memória; escritas persistem (localStorage ou Supabase).
 // API: db.list, db.get, db.find, db.count, db.insert, db.update, db.remove, db.upsert, db.seed, db.on, db.reset,
-//      db.config, db.setConfig, db.batch, db.mode, db.ready, db.cols
+//      db.config, db.setConfig, db.batch, db.mode, db.dadosDemo, db.ready, db.cols
 export const COLS = ['users', 'team', 'clients', 'contacts', 'contracts', 'services', 'healthHistory', 'deliveries', 'tasks', 'invoices', 'payables', 'cash', 'deals', 'routines', 'routineRuns', 'integrations', 'alerts', 'alertRules', 'notifications', 'comments', 'activity', 'webinars', 'campaignAccount', 'campaignDaily', 'campaigns', 'onboarding', 'meetings', 'timeEntries', 'goals', 'settings', 'clientResults', 'clientActions', 'mrrMoves', 'finance', 'costs', 'projects', 'checkins', 'oneOnOnes', 'teamStats', 'insights', 'webinarDaily', 'creatives', 'invites', 'recsLog', 'relatorios'];
-const KEY = 'aos-db-v1';
 const DB_VERSION = 4; // suba este número quando os dados de exemplo mudarem: o modo demonstração recarrega a semente
 // "Ver como" é só visualização: nenhuma escrita sai do navegador enquanto estiver ativo.
 let leituraFn = () => false, avisoLeitura = null, ultimoAviso = 0;
@@ -15,6 +14,11 @@ function bloqueado(col) {
 const CFG = (typeof window !== 'undefined' && window.AOS_CONFIG) || {};
 const SUPA = !!(CFG.supabaseUrl && CFG.supabaseAnonKey);
 const SUPA_ESM = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm';
+// Dados de exemplo (sementes fictícias dos módulos e snapshots de demonstração) existem SÓ no modo demonstração.
+// Produção (Supabase com seedDemo:false) e o modo de teste "produção vazia" (sem Supabase, AOS_CONFIG.seedDemo === false)
+// começam vazios e os módulos calculam tudo das coleções reais. Leia com `db.dadosDemo` (nunca use db.mode para isso).
+const DADOS_DEMO = SUPA ? !!CFG.seedDemo : CFG.seedDemo !== false;
+const KEY = DADOS_DEMO ? 'aos-db-v1' : 'aos-db-v1-vazio'; // banco local separado para o modo sem dados de exemplo
 
 let mem = {};            // col -> array de objetos
 let meta = { v: DB_VERSION, seeded: [] };
@@ -175,6 +179,8 @@ function applySeed(col, list, opts = {}) {
 
 export const db = {
   get mode() { return SUPA ? 'supabase' : 'demo'; },
+  /** true só quando há dados de exemplo (modo demonstração). Em produção os módulos NUNCA mostram snapshots fictícios. */
+  get dadosDemo() { return DADOS_DEMO; },
   get cols() { return COLS.slice(); },
   get loaded() { return loaded; },
   ready: null,
@@ -230,7 +236,7 @@ export const db = {
     if (!Array.isArray(list)) return false;
     seedReg.push({ col, list: clone(list), opts });
     if (!loaded) { pendingSeeds.push({ col, list, opts }); return false; }
-    if (SUPA && !CFG.seedDemo) return false;
+    if (!DADOS_DEMO) return false;
     return applySeed(col, list, opts);
   },
   /** executa várias escritas emitindo um único evento ('*','batch') no final */
@@ -249,7 +255,7 @@ export const db = {
   reset(opts = {}) {
     if (SUPA) { console.warn('db.reset() só funciona no modo demonstração'); return false; }
     mem = {}; meta = { v: DB_VERSION, seeded: [] }; COLS.forEach(arr);
-    for (const s of seedReg) applySeed(s.col, s.list, s.opts);
+    if (DADOS_DEMO) for (const s of seedReg) applySeed(s.col, s.list, s.opts);
     LocalAdapter.flush();
     emit('*', 'reset', null);
     if (opts.reload !== false && typeof location !== 'undefined') location.reload();
