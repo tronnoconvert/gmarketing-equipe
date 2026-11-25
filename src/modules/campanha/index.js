@@ -49,7 +49,7 @@ export function thumb(cr, o = {}) {
 /* ---------------- cabeçalho / abas ---------------- */
 function topo(ctx, aba) {
   const { ui } = ctx; const c = conta() || {}; const lim = limites();
-  const ledC = c.conectada ? ui.led('ok', `Conectada · ${c.accountId}`) : ui.led('off', 'Demonstração · conta ainda não conectada');
+  const ledC = c.conectada ? ui.led('ok', `Conectada · ${c.accountId}`) : ui.led('off', ctx.db.dadosDemo ? 'Demonstração · conta ainda não conectada' : 'Conta ainda não conectada');
   const n = pendentes().length;
   return `${ui.cabecalho({
     titulo: 'Campanha', sub: 'Sua conta própria de tráfego (Meta Ads via Windsor.ai): resultado, criativos e as decisões que valem a pena tomar hoje.',

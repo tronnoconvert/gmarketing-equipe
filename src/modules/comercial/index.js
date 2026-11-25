@@ -21,6 +21,13 @@ const metas = () => Object.assign({ novoMrr: 20000, propostas: 18, ganhos: 7 }, 
 const mrr = v => `${fmt.brl(v)}/mês`;
 const nomeT = id => (db.get('team', id) || {}).nome || '';
 
+/** meses anteriores (1–5): consolidado de exemplo no modo demonstração; em produção calculado das oportunidades reais */
+function historico() {
+  if (db.dadosDemo) return HISTORICO;
+  const all = db.list('deals');
+  return [5, 4, 3, 2, 1].map(k => { const g = all.filter(d => d.etapa === 'ganho' && doMes(d.ganhoEm, k)); return { mesesAtras: k, enviadas: all.filter(d => doMes(d.propostaEm, k)).length, ganhas: g.length, novoMrr: g.reduce((s, d) => s + (Number(d.valor) || 0), 0) }; });
+}
+
 function calc() {
   const all = db.list('deals');
   const abertas = all.filter(d => ABERTAS.includes(d.etapa));
@@ -34,13 +41,13 @@ function calc() {
 
 function kpis(ctx, c) {
   const { ui } = ctx; const m = metas();
-  const serieNovo = [...HISTORICO.map(h => h.novoMrr / 1000), c.novoMrr / 1000];
-  const taxa = c.propMes.length ? (c.ganhosMes.length / c.propMes.length) * 100 : 0;
+  const serieNovo = [...historico().map(h => h.novoMrr / 1000), c.novoMrr / 1000];
+  const taxa = c.propMes.length ? (c.ganhosMes.length / c.propMes.length) * 100 : null;
   return `<div class="g-kpi m-comercial-kpi">
 ${!VV() ? kpisSemValor(ctx, c, taxa) : `${ui.kpi({ rotulo: 'Pipeline aberto', valor: fmt.brlK(c.abertas.reduce((s, d) => s + d.valor, 0)), delta: fmt.plural(c.abertas.length, 'oportunidade'), deltaBom: null, comp: 'em MRR', ajuda: 'Soma do MRR (valor mensal) das oportunidades de Lead a Negociação.', href: '#/comercial/pipeline' })}
 ${ui.kpi({ rotulo: 'Receita ponderada', valor: fmt.brlK(c.ponderada), delta: `${fmt.pct((c.ponderada / (c.abertas.reduce((s, d) => s + d.valor, 0) || 1)) * 100, 0)} do pipeline`, deltaBom: null, ajuda: `MRR × probabilidade da etapa: ${ETAPAS.filter(e => ABERTAS.includes(e.id)).map(e => `${e.rotulo} ${e.prob}%`).join(' · ')}.`, href: '#/comercial/desempenho' })}
-${ui.kpi({ rotulo: 'Novo MRR no mês', valor: fmt.brl(c.novoMrr), delta: `${fmt.pct((c.novoMrr / m.novoMrr) * 100, 0)} da meta`, deltaBom: c.novoMrr >= m.novoMrr ? true : null, comp: `meta ${fmt.brl(m.novoMrr)}`, serie: serieNovo, formatoSerie: 'mil', ajuda: 'Soma do MRR dos negócios ganhos no mês. Entra na ponte de MRR como "Novos".' })}
-${ui.kpi({ rotulo: 'Taxa de ganho', valor: fmt.pct(taxa, 1), delta: `${c.ganhosMes.length} de ${c.propMes.length} propostas`, deltaBom: null, comp: 'no mês', ajuda: 'Negócios ganhos no mês ÷ propostas enviadas no mês.', href: '#/comercial/propostas' })}
+${ui.kpi({ rotulo: 'Novo MRR no mês', valor: fmt.brl(c.novoMrr), delta: `${fmt.pct((c.novoMrr / m.novoMrr) * 100, 0)} da meta`, deltaBom: c.novoMrr >= m.novoMrr ? true : null, comp: `meta ${fmt.brl(m.novoMrr)}`, serie: serieNovo.some(v => v > 0) ? serieNovo : null, formatoSerie: 'mil', ajuda: 'Soma do MRR dos negócios ganhos no mês. Entra na ponte de MRR como "Novos".' })}
+${ui.kpi({ rotulo: 'Taxa de ganho', valor: taxa == null ? '—' : fmt.pct(taxa, 1), delta: `${c.ganhosMes.length} de ${c.propMes.length} propostas`, deltaBom: null, comp: taxa == null ? 'nenhuma proposta no mês' : 'no mês', ajuda: 'Negócios ganhos no mês ÷ propostas enviadas no mês.', href: '#/comercial/propostas' })}
 ${ui.kpi({ rotulo: 'Ciclo de venda', valor: c.ciclo == null ? '—' : `${c.ciclo} dias`, comp: 'do lead ao ganho', ajuda: 'Média de dias entre a criação da oportunidade e o ganho, nos negócios ganhos.' })}
 ${ui.kpi({ rotulo: 'Ações vencidas', valor: String(c.atrasadas.length), comp: c.atrasadas.length ? fmt.brlK(c.atrasadas.reduce((s, d) => s + d.valor, 0)) + ' em MRR parado' : 'tudo em dia', alerta: c.atrasadas.length > 0, href: '#/comercial/pipeline?f=atrasadas', ajuda: 'Oportunidades abertas cuja próxima ação passou da data.' })}`}
 </div>`;
@@ -51,7 +58,7 @@ function kpisSemValor(ctx, c, taxa) {
   return `${ui.kpi({ rotulo: 'Abertas', valor: fmt.num(c.abertas.length), comp: 'oportunidades de lead a negociação', href: '#/comercial/pipeline', ajuda: 'Oportunidades de Lead a Negociação.' })}
 ${ui.kpi({ rotulo: 'Em negociação', valor: fmt.num(c.abertas.filter(d => d.etapa === 'negociacao' || d.etapa === 'proposta').length), comp: 'proposta enviada ou negociando' })}
 ${ui.kpi({ rotulo: 'Ganhos no mês', valor: fmt.num(c.ganhosMes.length), comp: `meta ${fmt.num(m.ganhos)}`, deltaBom: c.ganhosMes.length >= m.ganhos ? true : null, ajuda: 'Negócios fechados no mês.' })}
-${ui.kpi({ rotulo: 'Taxa de ganho', valor: fmt.pct(taxa, 1), delta: `${c.ganhosMes.length} de ${c.propMes.length} propostas`, deltaBom: null, comp: 'no mês', ajuda: 'Negócios ganhos no mês ÷ propostas enviadas no mês.', href: '#/comercial/propostas' })}
+${ui.kpi({ rotulo: 'Taxa de ganho', valor: taxa == null ? '—' : fmt.pct(taxa, 1), delta: `${c.ganhosMes.length} de ${c.propMes.length} propostas`, deltaBom: null, comp: taxa == null ? 'nenhuma proposta no mês' : 'no mês', ajuda: 'Negócios ganhos no mês ÷ propostas enviadas no mês.', href: '#/comercial/propostas' })}
 ${ui.kpi({ rotulo: 'Ciclo de venda', valor: c.ciclo == null ? '—' : `${c.ciclo} dias`, comp: 'do lead ao ganho', ajuda: 'Média de dias entre a criação da oportunidade e o ganho, nos negócios ganhos.' })}
 ${ui.kpi({ rotulo: 'Ações vencidas', valor: String(c.atrasadas.length), comp: c.atrasadas.length ? 'próxima ação passou da data' : 'tudo em dia', alerta: c.atrasadas.length > 0, href: '#/comercial/pipeline?f=atrasadas', ajuda: 'Oportunidades abertas cuja próxima ação passou da data.' })}`;
 }
@@ -145,7 +152,7 @@ ${ui.tabela({ densa: true, mobile: 'scroll', cols: [{ k: 'o', l: 'Origem' }, { k
 /* ---------------- propostas ---------------- */
 function paginaPropostas(ctx, c) {
   const { ui, charts } = ctx;
-  const meses = [...HISTORICO.map(h => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - h.mesesAtras); return { rot: fmt.MESES_CURTOS[d.getMonth()], env: h.enviadas, gan: h.ganhas }; }), { rot: fmt.MESES_CURTOS[new Date().getMonth()], env: c.propMes.length, gan: c.ganhosMes.length }];
+  const meses = [...historico().map(h => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - h.mesesAtras); return { rot: fmt.MESES_CURTOS[d.getMonth()], env: h.enviadas, gan: h.ganhas }; }), { rot: fmt.MESES_CURTOS[new Date().getMonth()], env: c.propMes.length, gan: c.ganhosMes.length }];
   const rot = meses.map(x => x.rot.charAt(0).toUpperCase() + x.rot.slice(1));
   const grafico = ui.card({ titulo: 'Propostas enviadas × ganhas', sub: 'Últimos 6 meses · mês atual até hoje', ajuda: 'Enviadas = propostas com data de envio no mês. Ganhas = negócios fechados no mês (podem ter proposta de meses anteriores).',
     corpo: charts.barras({ rotulos: rot, series: [{ nome: 'Enviadas', dados: meses.map(x => x.env) }, { nome: 'Ganhas', dados: meses.map(x => x.gan), cor: 'var(--c3)' }], formato: 'num', altura: 240, destaque: meses.length - 1 }) });
