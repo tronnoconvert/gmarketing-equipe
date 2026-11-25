@@ -1,0 +1,27 @@
+# Netlify: publica automaticamente o painel a cada envio para o ramo "producao".
+[build]
+  command = "npm ci && npm run build && rm -f dist/agencia-os.html"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+# a página e a configuração nunca ficam em cache; app.js/app.css vão com ?v=<versão>
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+[[headers]]
+  for = "/"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+[[headers]]
+  for = "/config.js"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "SAMEORIGIN"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
