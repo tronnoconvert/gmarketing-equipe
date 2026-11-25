@@ -793,3 +793,32 @@ begin
 end $$;
 revoke execute on function public.voo_reservar_mudanca(text, text, text, uuid, numeric, numeric, int) from public, anon, authenticated;
 grant execute on function public.voo_reservar_mudanca(text, text, text, uuid, numeric, numeric, int) to service_role;
+
+-- =====================================================================================
+-- BACKUPS E AUDITORIA (docs/BACKUP-E-RESTAURACAO.md) — seção acrescentada; não altera as de cima.
+-- * Status dos backups e da auditoria em records 'backupStatus:<nativo|diario|externo|auditoria>' (card "Backups" do Cockpit).
+--   Leitura: só Dono/Admin — a coleção não está em col_modules (can_col exige o módulo admin) E está em receita_colecoes
+--   (quem não vê receita não recebe nem por ler_records/ler_record/realtime). Gravação: só o servidor (Edge Function
+--   backup-diario / SQL da auditoria); ninguém do app grava nem apaga.
+-- * Bucket privado `backups` do Storage: sem nenhuma política para anon/authenticated (só a service role acessa).
+-- =====================================================================================
+insert into public.receita_colecoes (col) values ('backupStatus') on conflict do nothing;
+
+create or replace function public.tg_backup_status_guard() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if public.e_servidor() then return coalesce(new, old); end if;
+  if (tg_op = 'DELETE' and old.col = 'backupStatus') or (tg_op <> 'DELETE' and (new.col = 'backupStatus' or new.id like 'backupStatus:%'))
+     or (tg_op = 'UPDATE' and old.col = 'backupStatus') then
+    raise exception 'O status dos backups só é gravado pelo servidor.' using errcode = '42501';
+  end if;
+  return coalesce(new, old);
+end $$;
+revoke execute on function public.tg_backup_status_guard() from public, anon, authenticated;
+drop trigger if exists records_backup_status_guard on public.records;
+create trigger records_backup_status_guard before insert or update or delete on public.records
+  for each row execute function public.tg_backup_status_guard();
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('backups', 'backups', false, 524288000, array['application/gzip', 'application/json'])
+on conflict (id) do update set public = false;

@@ -50,6 +50,7 @@ jobs:
           openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -md sha256 -pass env:BACKUP_PASSPHRASE -in "$RUNNER_TEMP/bk/gmarketing-$DIA.json.gz.enc" | sha256sum | grep -q "$SHA"
           rm -f "$RUNNER_TEMP/bk/b.json.gz"
           echo "DIA=$DIA" >> "$GITHUB_ENV"; echo "SHA=$SHA" >> "$GITHUB_ENV"
+          echo "BYTES=$(stat -c %s "$RUNNER_TEMP/bk/gmarketing-$DIA.json.gz.enc")" >> "$GITHUB_ENV"
       - name: Gravar no ramo backups
         run: |
           set -euo pipefail
@@ -70,4 +71,23 @@ jobs:
           git add -A
           git commit --quiet -m "backup $DIA" || echo "nada novo"
           git push --quiet origin HEAD:backups
+          echo "ARQUIVOS=$(ls -1 diario/*.enc | wc -l)" >> "$GITHUB_ENV"
           rm -rf "$RUNNER_TEMP/bk"
+      # informa o resultado ao app (LED "Cópia externa" no Cockpit do Dono/Admin e rotina na Torre)
+      - name: Registrar sucesso no painel
+        if: success()
+        env:
+          URL: ${{ secrets.SUPABASE_FUNCTIONS_URL }}
+          SEG: ${{ secrets.BACKUP_DOWNLOAD_SECRET }}
+        run: |
+          curl -sS -X POST "$URL/backup-diario" -H "x-backup-secret: $SEG" -H 'Content-Type: application/json' \
+            -d "{\"acao\":\"registrar_externo\",\"ok\":true,\"dia\":\"$DIA\",\"bytes\":${BYTES:-0},\"sha256\":\"$SHA\",\"arquivos\":${ARQUIVOS:-0}}"
+      - name: Registrar falha no painel
+        if: failure()
+        env:
+          URL: ${{ secrets.SUPABASE_FUNCTIONS_URL }}
+          SEG: ${{ secrets.BACKUP_DOWNLOAD_SECRET }}
+        run: |
+          [ -n "$URL" ] && [ -n "$SEG" ] || exit 0
+          curl -sS -X POST "$URL/backup-diario" -H "x-backup-secret: $SEG" -H 'Content-Type: application/json' \
+            -d '{"acao":"registrar_externo","ok":false,"erro":"a cópia externa falhou: veja a aba Actions do GitHub"}' || true

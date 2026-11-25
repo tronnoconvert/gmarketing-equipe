@@ -7,6 +7,7 @@ import { estadoFatura } from '../financeiro/calc.js';
 import { padrao } from '../../core/padroes/index.js';
 import { limOcupacao, rotuloOcupacao } from '../operacao/lib.js';
 import { itensReais, renderReal } from './real.js'; // produção (db.dadosDemo false): tudo das coleções reais
+import { cardBackups } from './backups.js'; // card "Backups" (só Dono/Admin)
 
 const RES_ID = 'cockpit-resolvidos';
 const SEM_EDICAO = 'Seu perfil só visualiza o Cockpit. Peça acesso de edição para marcar itens como resolvidos.';
@@ -120,7 +121,7 @@ function render(ctx) {
   return `<div class="pg m-cockpit">${head}${kpis}
 <div class="ck-r1">${precisa}${saude}</div>
 <div class="g-2-1">${rc}${torre}</div>
-<div class="g-2-1">${mapa}<div class="stack ck-st">${capacidade}${renov}</div></div></div>`;
+<div class="g-2-1">${mapa}<div class="stack ck-st">${capacidade}${renov}${cardBackups(ctx)}</div></div></div>`;
 }
 
 function receitaCustos(ctx) {
@@ -167,6 +168,6 @@ function mount(el, ctx) {
 
 export default {
   id: 'cockpit', titulo: 'Cockpit', icone: 'gauge', grupo: 'visao', rota: 'cockpit', routes: ['cockpit'],
-  watch: ['finance', 'invoices', 'clients', 'routines', 'teamStats', 'team', 'alerts', 'cash', 'deliveries'],
+  watch: ['finance', 'invoices', 'clients', 'routines', 'teamStats', 'team', 'alerts', 'cash', 'deliveries', 'backupStatus'],
   render, mount,
 };

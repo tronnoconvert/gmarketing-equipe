@@ -4,6 +4,8 @@
 //                                                                    apaga os antigos (35 dias; dia 1º de cada mês fica 12 meses)
 //   {acao:'baixar', data?:'AAAA-MM-DD'}  header x-backup-secret = BACKUP_DOWNLOAD_SECRET
 //                                       → devolve o .json.gz (mais recente, ou da data) — usado pela cópia fora do Supabase (GitHub Actions)
+//   {acao:'registrar_externo', ok, dia?, bytes?, sha256?, erro?}  header x-backup-secret → o GitHub Actions informa o resultado
+//                                       da cópia externa (vira o LED "Cópia externa" no Cockpit e a rotina na Torre)
 //   {acao:'listar'}  header x-backup-secret ou x-cron-secret → lista os arquivos e manifestos
 // Publicada com verify_jwt = false: a autenticação é SÓ pelos segredos acima (comparação em tempo constante). Sem segredo → 401.
 // Nunca exporta: hashes de senha (auth.users), senha_temp_hash do perfil, voo_cache (cache descartável).
@@ -105,6 +107,32 @@ async function podar(sb: SB) {
   return apagar;
 }
 
+/* ---------- status para o Cockpit (card "Backups", só Dono/Admin) e para a Torre (rotinas) ----------
+   records 'backupStatus:<tipo>' (tipo = nativo | diario | externo | auditoria). A coleção não está em col_modules
+   (só quem administra lê) e está em receita_colecoes (quem não vê receita não recebe nem pelo realtime). */
+const ORG = () => env('DEFAULT_ORG_ID') ?? 'gmarketing';
+const ROTINAS: Record<string, { id: string; nome: string; desc: string; freq: string }> = {
+  diario: { id: 'r-backup-diario', nome: 'Backup diário dos dados (03:10)', desc: 'Exporta todas as tabelas do app para o armazenamento privado do Supabase (35 dias + 1 por mês por 12 meses)', freq: 'diário 03:10' },
+  externo: { id: 'r-backup-externo', nome: 'Cópia externa criptografada (03:40)', desc: 'Copia o backup do dia, criptografado, para o GitHub (fora do Supabase)', freq: 'diário 03:40' },
+};
+async function gravarStatus(sb: SB, tipo: string, dados: Record<string, unknown>) {
+  const agora = new Date().toISOString();
+  const doc = { id: tipo, tipo, ultimaEm: agora, ...dados };
+  const linhas: Record<string, unknown>[] = [{ id: `backupStatus:${tipo}`, col: 'backupStatus', org_id: ORG(), data: doc }];
+  const r = ROTINAS[tipo];
+  if (r) {
+    const { data: atual } = await sb.from('records').select('data').eq('id', `routines:${r.id}`).maybeSingle();
+    const h = Array.isArray(atual?.data?.hist30) ? atual.data.hist30.slice(-29) : [];
+    h.push(dados.ok ? 'ok' : 'err');
+    linhas.push({ id: `routines:${r.id}`, col: 'routines', org_id: ORG(), data: { ...(atual?.data ?? {}), id: r.id, nome: r.nome, desc: r.desc, freq: r.freq, freqMin: 1440, ativo: true,
+      estado: dados.ok ? 'ok' : 'err', ultimaEm: agora, duracaoS: Math.round(Number(dados.duracao_ms ?? 0) / 1000), hist30: h,
+      sucesso30: Math.round(h.filter((x: string) => x === 'ok').length / h.length * 100), integracoes: [], canais: ['app'], respId: null, sistema: true,
+      ultimaMsg: dados.ok ? `Backup ${dados.dia ?? ''} gravado` : `Falhou: ${String(dados.erro ?? 'erro')}`.slice(0, 200) } });
+  }
+  const { error } = await sb.from('records').upsert(linhas);
+  if (error) console.error('[backup-diario] status:', error.message);
+}
+
 async function listar(sb: SB) {
   const { data, error } = await sb.storage.from(BUCKET).list(PASTA, { limit: 1000, sortBy: { column: 'name', order: 'desc' } });
   if (error) throw new Error(`listar: ${error.message}`);
@@ -118,11 +146,23 @@ Deno.serve(async (req) => {
   const acao = String(b.acao ?? 'exportar');
   const cron = temSegredo(req, 'x-cron-secret', 'CRON_SECRET');
   const baixa = temSegredo(req, 'x-backup-secret', 'BACKUP_DOWNLOAD_SECRET');
-  const ok = acao === 'exportar' ? cron : acao === 'baixar' ? baixa : acao === 'listar' ? (cron || baixa) : false;
+  const ok = acao === 'exportar' ? cron : acao === 'baixar' || acao === 'registrar_externo' ? baixa : acao === 'listar' ? (cron || baixa) : false;
   if (!ok) return json({ erro: 'Não autorizado.', codigo: 'nao_autorizado' }, 401);
   const sb = createClient(env('SUPABASE_URL')!, env('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false, autoRefreshToken: false } });
   try {
-    if (acao === 'exportar') return json(await exportar(sb));
+    if (acao === 'exportar') {
+      try {
+        const r = await exportar(sb);
+        await gravarStatus(sb, 'diario', { ok: true, dia: r.dia, bytes: r.bytes_gz, contagens: r.contagens, sha256: r.sha256_gz, duracao_ms: r.duracao_ms, apagados: r.apagados.length });
+        return json(r);
+      } catch (e) { await gravarStatus(sb, 'diario', { ok: false, erro: e instanceof Error ? e.message : String(e) }); throw e; }
+    }
+    if (acao === 'registrar_externo') {
+      const ok = b.ok === true;
+      await gravarStatus(sb, 'externo', { ok, dia: typeof b.dia === 'string' ? b.dia.slice(0, 10) : null, bytes: Number(b.bytes) || null,
+        sha256: typeof b.sha256 === 'string' ? b.sha256.slice(0, 64) : null, arquivos: Number(b.arquivos) || null, erro: ok ? null : String(b.erro ?? 'falha na cópia externa').slice(0, 200) });
+      return json({ ok: true });
+    }
     if (acao === 'listar') return json({ arquivos: await listar(sb) });
     // baixar
     let dia = typeof b.data === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(b.data) ? b.data : '';

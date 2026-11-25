@@ -76,6 +76,8 @@ export default async function (t) {
   const ml = await page.textContent('#ml');
   ok(/Sem rotinas configuradas/.test(ml), `luz mestra "Sem rotinas configuradas" (${ml.trim()})`);
   ok(!/Tudo operando/.test(ml), 'não diz "Tudo operando" sem rotinas');
+  ok(/Primeiro backup às 03:10/.test(await page.textContent('.ck-backups')), 'card Backups vazio: "Primeiro backup às 03:10"');
+  ok(!(await page.$$eval('.ck-bk .led.ok', e => e.length)), 'sem LED verde fictício em produção');
   ok(await page.$eval('#bell .ib-badge', e => e.hidden), 'sino sem contador');
   ok(!(await page.$$eval('.nv .nv-badge, .nv .nv-dot, .nv [class*="cnt"]', e => e.length)), 'menu sem contadores');
 

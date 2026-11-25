@@ -27,6 +27,13 @@ export default async function (t) {
   ok(await page.$$eval('.ck-comp a', e => e.map(a => a.getAttribute('href')).join()) === '#/financeiro,#/clientes,#/operacao,#/equipe', 'componentes da saúde levam aos módulos');
   ok(await page.$$eval('.ch-linhas svg.chart', e => e.length) >= 1, 'gráfico Receita × Custos');
 
+  step('card Backups (dono): 3 backups verdes + auditoria (demonstração)');
+  ok(await page.isVisible('.ck-backups'), 'card Backups visível para o dono');
+  ok(await page.$$eval('.ck-bk [data-backup]', e => e.map(x => x.dataset.backup).join()) === 'nativo,diario,externo,auditoria', 'Supabase nativo, Exportação diária, Cópia externa e Auditoria');
+  ok(await page.$$eval('.ck-bk [data-backup] .led.ok', e => e.length) === 4, 'LEDs verdes na demonstração');
+  ok(/último: \d\d\/\d\d às \d\d:\d\d/.test(await page.textContent('.ck-backups')), '"último: dd/mm às hh:mm"');
+  ok(/3 de 3 em dia/.test(await page.textContent('.ck-backups')), '"3 de 3 em dia"');
+
   step('acima da dobra (1366×900)');
   if (t.vp.w === 1366) {
     const b = await page.$eval('.ck-hoje .ck-it:last-child', e => e.getBoundingClientRect().bottom);
@@ -83,4 +90,5 @@ export default async function (t) {
   await t.ir('#/cockpit'); await page.waitForSelector('.m-cockpit');
   ok(await page.$eval('[data-resolver="orion"]', e => e.disabled), 'Resolvido desabilitado para quem só vê');
   ok((await page.$eval('[data-resolver="orion"]', e => e.title)).includes('visualiza'), 'tooltip explica');
+  ok(!(await page.$('.ck-backups')), 'card Backups NÃO aparece para quem não é Dono/Admin');
 }

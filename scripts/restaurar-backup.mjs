@@ -8,6 +8,7 @@
 //   ... --sha256 <hash do .gz>    confere a integridade com o manifesto
 //   ... --projeto <ref> --aplicar  restaura NO projeto <ref> pela Management API (precisa SUPABASE_ACCESS_TOKEN,
 //                                  ou HTTPS_PROXY que injete o token). Sem --aplicar: simulação (mostra o que faria).
+//   ... --projeto <ref> --ensaio   executa todo o SQL da restauração e DESFAZ (rollback): prova que a restauração funciona.
 //
 // O .enc é o formato do `openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -md sha256 -salt`:
 //   "Salted__" + sal(8) + dados; chave(32)+iv(16) = PBKDF2-HMAC-SHA256(senha, sal, 200000, 48).
@@ -34,7 +35,7 @@ export function decifrar(buf, senha) {
 }
 
 const TABELAS = { // ordem de restauração e chave de conflito
-  orgs: 'id', perm_padrao: 'mod,papel', col_modules: 'col', receita_colecoes: 'col', receita_campos: null,
+  orgs: 'id', perm_padrao: 'mod,papel', col_modules: 'col,mod', receita_colecoes: 'col', receita_campos: 'col,caminho',
   records: 'id', voo_mudancas: 'id', profiles: 'user_id',
 };
 
@@ -69,7 +70,7 @@ async function restaurar(b, ref, aplicar) {
   for (const [t, chave] of Object.entries(TABELAS)) {
     let linhas = b.tabelas[t];
     if (t === 'profiles') linhas = linhas.filter((p) => existentes.has(p.user_id));
-    console.log(`${aplicar ? 'restaurando' : '[simulação]'} ${t}: ${linhas.length} linha(s)`);
+    console.log(`${aplicar === 'ensaio' ? '[ensaio: grava e desfaz]' : aplicar ? 'restaurando' : '[simulação]'} ${t}: ${linhas.length} linha(s)`);
     if (!aplicar || !linhas.length) continue;
     for (let i = 0; i < linhas.length; i += 500) {
       const lote = JSON.stringify(linhas.slice(i, i + 500));
@@ -77,10 +78,10 @@ async function restaurar(b, ref, aplicar) {
       const conflito = chave ? `on conflict (${chave}) do update set ${cols.filter((c) => !chave.split(',').includes(c)).map((c) => `${c} = excluded.${c}`).join(', ') || `${cols[0]} = excluded.${cols[0]}`}` : 'on conflict do nothing';
       await sql(ref, `begin; set local session_replication_role = replica;
         insert into public.${t} (${cols.join(',')}) select ${cols.join(',')} from jsonb_populate_recordset(null::public.${t}, ${lit(lote)}::jsonb) ${conflito};
-        commit;`);
+        ${aplicar === 'ensaio' ? 'rollback' : 'commit'};`);
     }
   }
-  if (aplicar) console.log('\nRestauração concluída. Confira as contagens no app e rode tests/live/auditoria.mjs.');
+  if (aplicar === true) console.log('\nRestauração concluída. Confira as contagens no app e rode tests/live/auditoria.mjs.');
 }
 
 const buf = readFileSync(arquivo);
@@ -101,4 +102,4 @@ console.table(b.contagens);
 if (erros.length) { console.error('✘ problemas:\n  ' + erros.join('\n  ')); process.exit(1); }
 console.log('✔ backup válido');
 if (opt('--saida')) { mkdirSync(opt('--saida'), { recursive: true, mode: 0o700 }); const p = join(opt('--saida'), basename(arquivo).replace(/(\.json)?\.gz(\.enc)?$/, '') + '.json'); writeFileSync(p, JSON.stringify(b, null, 1), { mode: 0o600 }); console.log(`JSON aberto em ${p} (dados sensíveis: apague depois)`); }
-if (opt('--projeto')) await restaurar(b, opt('--projeto'), flag('--aplicar'));
+if (opt('--projeto')) await restaurar(b, opt('--projeto'), flag('--aplicar') ? true : flag('--ensaio') ? 'ensaio' : false);

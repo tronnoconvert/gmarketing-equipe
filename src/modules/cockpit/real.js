@@ -1,6 +1,7 @@
 // cockpit/real.js — Cockpit em PRODUÇÃO (db.dadosDemo === false). Tudo calculado das coleções reais; o snapshot de
 // cockpit/data.js fica só para o modo demonstração. Onde não há dado ainda, o card vira um estado vazio que ensina o próximo passo.
 import { padrao } from '../../core/padroes/index.js';
+import { cardBackups } from './backups.js'; // card "Backups" (só Dono/Admin)
 import { limOcupacao, rotuloOcupacao, ocupacao, entregasNaJanela, pctNoPrazo } from '../operacao/lib.js';
 import { estadoFatura, atrasoCritico, abertas } from '../financeiro/calc.js';
 import * as FIN from '../financeiro/real.js';
@@ -135,5 +136,5 @@ export function renderReal(ctx, head, precisa) {
   return `<div class="pg m-cockpit ck-real">${head}${primeirosPassos(ctx)}${kpis(ctx)}
 <div class="ck-r1">${precisa}${saude(ctx)}</div>
 <div class="g-2-1">${rc}${torre(ctx)}</div>
-<div class="g-2-1">${mapa(ctx)}<div class="stack ck-st">${capacidade(ctx)}${renovacoes(ctx)}</div></div></div>`;
+<div class="g-2-1">${mapa(ctx)}<div class="stack ck-st">${capacidade(ctx)}${renovacoes(ctx)}${cardBackups(ctx)}</div></div></div>`;
 }
