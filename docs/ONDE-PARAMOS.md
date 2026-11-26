@@ -1,3 +1,24 @@
+# Onde paramos — 26/11/2026 (retomar quando o dono disser "oi")
+
+## Pendente do DONO (pedir de novo, 100% específico)
+1. Netlify › projeto gmarketing-painel › Project configuration › General › Visitor access → No protection (site dá 401 hoje).
+2. Cópia 3 (GitHub): dono cria senha A e senha B no gerenciador de senhas; senha A em Supabase › Functions › Secrets (editar BACKUP_DOWNLOAD_SECRET);
+   GitHub › Settings › Secrets › Actions: SUPABASE_FUNCTIONS_URL=https://hzonfbqsjxiwfmjywdlw.supabase.co/functions/v1, BACKUP_DOWNLOAD_SECRET=A, BACKUP_PASSPHRASE=B.
+   Depois: rodar Actions › backup-diario › Run workflow e conferir luz no Cockpit.
+3. Apagar ramo teste-workflow em https://github.com/tronnoconvert/gmarketing-equipe/branches
+4. Depois de publicar: vincular contas Meta aos clientes (Painel de Voo › Contas sem cliente vinculado), teto de mídia e meta de custo por conversa.
+5. Token Meta (usuário do sistema) para Pausar/Orçamento — passos em DEPLOY §8 / relatório item 17.
+
+## Minha parte
+- Agente em andamento ao parar: gestores veem TODOS os clientes (padrão "Meus", botão Meus/Todos), SEM limite de alterações de verba (dono removeu),
+  auditoria mostra quando um gestor altera cliente de outro (flag deOutroGestor + notificação ao responsável e dono/admin). Se não terminou, retomar.
+- Depois: rodar bateria completa, publicar no ramo `producao` (Netlify publica sozinho) incluindo netlify.toml do main (CSP/HSTS) — testar CSP no site.
+- Agendar auditoria semanal (comando em docs/BACKUP-E-RESTAURACAO.md §Auditoria) e conferir 1º backup diário (03:10) e cron aos-voo-dados.
+- Prontos e testados (não publicados): Painel de Voo nativo real (item 17), sem dados fictícios em produção, 3 backups + cartão no Cockpit, auditoria (131/132).
+- Publicado: login imersivo + frase do dia, Ver como somente leitura, marca maior. Site em Netlify (ramo producao), DNS CNAME painel → gmarketing-painel.netlify.app, HTTPS ok.
+- Cron ligado: aos-voo-dados (5 min), aos-backup-diario (06:10 UTC).
+
+---
 # Onde paramos — 25/11/2026
 
 ## No ar
