@@ -76,3 +76,40 @@
 .m-cockpit .ck-kpis .kpi-v{font-size:21px}
 @media (min-width:1500px){.m-cockpit .ck-kpis .kpi-v{font-size:24px}}
 .m-cockpit .card.np{display:block;max-height:none}
+.m-cockpit .ck-hoje.ck-ok{box-shadow:var(--sh)}
+
+/* produção (dados reais): cards sem dado viram um estado vazio emoldurado e "Primeiros passos" guia a configuração */
+.m-cockpit.ck-real .ck-r1,.m-cockpit.ck-real .g-2-1{align-items:start}
+.m-cockpit.ck-real .card .vz{border:1px dashed var(--line-2);border-radius:var(--r-sm);background:var(--card-2);padding:26px 20px 24px;gap:6px}
+.m-cockpit.ck-real .card .vz-i{background:var(--card);box-shadow:0 0 0 1px var(--line)}
+.m-cockpit.ck-real .card .vz p{font-size:13px}
+.m-cockpit.ck-real .card .vz .btn.pri{height:30px;padding:0 12px;font-size:12.5px;background:var(--card);border-color:var(--line-2);color:var(--fg);box-shadow:0 1px 2px rgba(15,23,42,.06)}
+.m-cockpit.ck-real .card .vz .btn.pri:hover{background:var(--card-3)}
+.m-cockpit.ck-real .card .vz .btn.pri .ic{color:var(--acc)}
+.m-cockpit .ck-passos{padding:20px 22px}
+.m-cockpit .ck-ps-h{display:flex;justify-content:space-between;align-items:flex-start;gap:12px 24px;flex-wrap:wrap}
+.m-cockpit .ck-ps-h h2{font-size:16px;font-weight:650;letter-spacing:-.01em}
+.m-cockpit .ck-ps-h p{margin-top:2px;max-width:62ch}
+.m-cockpit .ck-ps-pr{display:grid;gap:6px;min-width:160px;font-size:12.5px;color:var(--muted);text-align:right}
+.m-cockpit .ck-ps-pr b{color:var(--fg);font-weight:650}
+.m-cockpit .ck-ps{list-style:none;margin:16px 0 0;padding:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.m-cockpit .ck-ps li{display:flex;gap:12px;padding:14px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--card);min-width:0}
+.m-cockpit .ck-ps li.prox{border-color:color-mix(in srgb,var(--acc) 45%,var(--line));background:color-mix(in srgb,var(--acc) 4%,var(--card))}
+.m-cockpit .ck-ps li.ok{background:var(--card-2)}
+.m-cockpit .ck-ps-n{flex:none;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:650;background:var(--card-3);color:var(--fg2);font-variant-numeric:tabular-nums}
+.m-cockpit .ck-ps li.prox .ck-ps-n{background:var(--acc);color:var(--on-acc)}
+.m-cockpit .ck-ps li.ok .ck-ps-n{background:var(--ok);color:#fff}
+.m-cockpit .ck-ps-n .ic{width:13px;height:13px}
+.m-cockpit .ck-ps-m{display:grid;gap:4px;min-width:0;align-content:start}
+.m-cockpit .ck-ps-m b{font-size:13.5px;font-weight:600}
+.m-cockpit .ck-ps-m>span{font-size:12.5px;color:var(--muted);line-height:1.45}
+.m-cockpit .ck-ps li.ok .ck-ps-m b{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--line-3)}
+.m-cockpit .ck-ps-m .btn{justify-self:start;margin-top:6px}
+.m-cockpit .ck-ps-m>.ck-ps-f{color:var(--ok-t);font-weight:600;margin-top:6px}
+@media (max-width:1100px){.m-cockpit .ck-ps{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:560px){.m-cockpit .ck-ps{grid-template-columns:minmax(0,1fr)}.m-cockpit .ck-ps-pr{text-align:left;width:100%}.m-cockpit .ck-passos{padding:16px}}
+/* card "Backups" (cockpit/backups.js) */
+.ck-bk { list-style: none; margin: 0; padding: 0; }
+.ck-bk li { display: flex; align-items: flex-start; gap: 8px; padding: 6px 0; }
+.ck-bk .ck-bk-n { display: flex; flex-direction: column; min-width: 0; }
+.ck-bk .ck-bk-n .sm { overflow-wrap: anywhere; }

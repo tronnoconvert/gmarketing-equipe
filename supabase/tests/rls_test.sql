@@ -69,16 +69,17 @@ insert into public.records (id, col, data, org_id) values
   ('deals:d-1', 'deals', '{"id":"d-1","nome":"Rede Sabor"}', 'minha-agencia'),
   ('clients:c-x', 'clients', '{"id":"c-x","nome":"Cliente de outra org","respId":"t-ana"}', 'outra');
 
--- ================================================================ Ana (gestor de tráfego, escopo "seus")
+-- ================================================================ Ana (gestor de tráfego: vê todos os clientes desde 25/11/2026, sem receita)
 begin;
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000002","role":"authenticated"}', true);
 set local role authenticated;
 select t.ok(public.my_role() = 'gestor_trafego', 'my_role() da Ana');
-select t.ok(t.n('clients') = 1, 'Ana vê só o próprio cliente (e nada de outra org)');
-select t.ok(t.n('contacts') = 1, 'Ana vê só contatos dos seus clientes (clientId)');
+select t.ok(t.n('clients') = 2, 'Ana (gestora) vê todos os clientes da org (cobre colega) e nada de outra org');
+select t.ok(not public.escopo_limitado('clients'), 'gestor de tráfego sem escopo limitado');
+select t.ok(t.n('contacts') = 2, 'Ana vê contatos de todos os clientes');
 select t.ok(t.n('invoices') = 0, 'Ana não vê faturas (receita só para quem tem a permissão)');
 select t.ok(t.n('deals') = 0, 'Ana não vê o comercial');
-select t.ok(t.n('tasks') = 0, 'Ana não vê tarefa de cliente fora do escopo');
+select t.ok(t.n('tasks') = 1, 'Ana vê tarefa de cliente de outro responsável');
 select t.ok(t.n('alerts') = 1, 'Ana vê só alertas endereçados a ela / dos seus clientes');
 select t.ok(t.n('notifications') = 1, 'Ana lê só as próprias notificações');
 select t.ok(t.n('users') = 3, 'diretório de usuários visível');
@@ -86,7 +87,8 @@ select t.ok((select count(*) from public.ler_records('', 1000) where id like 'se
 -- escrita
 select t.upsert('contacts', '{"id":"ct-3","clientId":"c-orion","nome":"Novo contato"}');
 select t.ok(exists (select 1 from public.records where id = 'contacts:ct-3'), 'Ana cria contato do seu cliente via upsert (org_id preenchido pelo trigger)');
-select t.nega($$select t.upsert('contacts', '{"id":"ct-4","clientId":"c-vida","nome":"x"}')$$, 'Ana não cria contato de cliente alheio');
+select t.upsert('contacts', '{"id":"ct-4","clientId":"c-vida","nome":"x"}');
+select t.ok(exists (select 1 from public.records where id = 'contacts:ct-4'), 'Ana edita cliente de outro responsável (cobre colega)');
 select t.nega($$select t.upsert('deals', '{"id":"d-2","nome":"x"}')$$, 'Ana não grava no comercial');
 -- notificar alguém: insere notificação para outra pessoa (upsert do front)
 select t.upsert('notifications', '{"id":"n-3","para":"u-gabriel","de":"u-ana","titulo":"Aprova?","lida":false}');
@@ -150,6 +152,13 @@ select t.nega($$select t.upsert('users', '{"id":"u-gabriel","nome":"Gabriel","pa
 select t.upsert('users', '{"id":"u-ana","nome":"Ana","papel":"cs","ativo":true,"authId":"00000000-0000-0000-0000-000000000002","teamId":"t-ana"}');
 commit;
 select t.ok((select papel from public.profiles where user_id = '00000000-0000-0000-0000-000000000002') = 'cs', 'trocar papel em users sincroniza profiles');
+-- CS continua com escopo "seus clientes"
+begin;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000002","role":"authenticated"}', true);
+set local role authenticated;
+select t.ok(t.n('clients') = 1 and public.escopo_limitado('clients'), 'CS vê só os seus clientes');
+select t.nega($$select t.upsert('contacts', '{"id":"ct-5","clientId":"c-vida","nome":"x"}')$$, 'CS não cria contato de cliente alheio');
+commit;
 update public.profiles set papel = 'gestor_trafego' where user_id = '00000000-0000-0000-0000-000000000002';
 
 -- ================================================================ Ana depois da matriz alterada pelo dono

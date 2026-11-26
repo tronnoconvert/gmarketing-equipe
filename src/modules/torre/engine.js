@@ -19,7 +19,7 @@ const usuarioDe = teamId => { const t = db.get('team', teamId); return t && t.us
 function destinatariosRegra(regraId, respTeamId) {
   const r = db.get('alertRules', regraId);
   if (r && r.ativo === false) return { ativo: false, para: [], canais: [] };
-  const times = new Set((r && r.destinatarios) || ['t-gabriel']);
+  const times = new Set((r && r.destinatarios) || (db.dadosDemo ? ['t-gabriel'] : db.list('users', u => u.papel === 'dono' && u.ativo !== false).map(u => u.teamId).filter(Boolean)));
   if ((!r || r.resp) && respTeamId) times.add(respTeamId);
   return { ativo: true, para: [...times].map(usuarioDe).filter(Boolean), canais: (r && r.canais) || ['app'], times: [...times], regra: r };
 }

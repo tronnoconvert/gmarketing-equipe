@@ -7,7 +7,8 @@
 --   2) settings:perms       = diferenças salvas pelo app (sobrepõem o padrão)
 --   3) public.col_modules   = de qual(is) módulo(s) cada coleção depende (mapa abaixo)
 --   4) can_col(col, ação)   = o papel tem o nível exigido em algum módulo da coleção
---   5) escopo de clientes   = gestor_trafego, cs e produção só veem registros dos SEUS clientes
+--   5) escopo de clientes   = cs e produção só veem registros dos SEUS clientes (gestor de tráfego vê todos desde 25/11/2026;
+--                             a receita continua cortada por ve_receita)
 --
 -- Níveis: '' (sem acesso) < ver (1) < editar (2) < admin/Total (4). Sufixos :seus / :proprio = escopo.
 -- Ações: select exige ver · insert/update exigem editar · delete exige admin, ou dono/admin com editar
@@ -45,11 +46,11 @@ select m, p, v from (values
   ('mesa',         array['editar','editar','editar','editar','editar','editar','editar','editar','ver']),
   ('cockpit',      array['admin','editar','','','','','','','']),
   ('financeiro',   array['admin','editar','','','','','','','']),
-  ('clientes',     array['admin','editar','editar','editar:seus','editar:seus','ver:seus','ver','ver','ver']),
+  ('clientes',     array['admin','editar','editar','editar','editar:seus','ver:seus','ver','ver','ver']),
   ('operacao',     array['admin','editar','editar','editar','editar','editar:seus','','','ver']),
   ('equipe',       array['admin','editar','ver:proprio','ver:proprio','ver:proprio','ver:proprio','ver','ver:proprio','']),
   ('torre',        array['admin','editar','editar','ver','ver','','','','ver']),
-  ('torre_voo',    array['admin','editar','editar','editar:seus','ver','','','','ver']),
+  ('torre_voo',    array['admin','editar','editar','editar','ver','','','','ver']),
   ('comercial',    array['admin','editar','','','','','ver','editar','']),
   ('alertas',      array['admin','editar','ver','ver:seus','ver:seus','ver:seus','ver:seus','ver:seus','ver']),
   ('webinars',     array['admin','editar','editar','editar','editar','editar:seus','ver','ver','ver']),
@@ -194,7 +195,7 @@ $$;
 create or replace function public.escopo_limitado(p_col text) returns boolean
 language sql stable security definer set search_path = public as $$
   select exists (select 1 from public.col_modules where col = p_col and escopo_cliente)
-     and (public.my_role() in ('gestor_trafego','cs','producao') or public.perm_escopo('clientes') = 'seus')
+     and (public.my_role() in ('cs','producao') or public.perm_escopo('clientes') = 'seus')
 $$;
 
 -- o registro está no escopo do usuário? (para coleções ligadas a clientes)
@@ -747,3 +748,82 @@ grant execute on function public.registrar_senha_temporaria(uuid), public.usuari
 -- as funções de gravação não valem para anon
 revoke execute on function public.gravar_record(text, jsonb), public.apagar_record(text), public.concluir_troca_senha() from public, anon;
 grant execute on function public.gravar_record(text, jsonb), public.apagar_record(text), public.concluir_troca_senha() to authenticated;
+
+-- =====================================================================================
+-- PAINEL DE VOO (item 17) — cache dos dados do Meta (Windsor) e limite de mudanças de orçamento.
+-- Só o servidor (Edge Functions voo-dados / voo-acao, service role) lê e grava: RLS ligado e nenhuma política
+-- para anon/authenticated. O app recebe os dados já filtrados pelo escopo e sem receita pela função voo-dados.
+-- =====================================================================================
+create table if not exists public.voo_cache (
+  chave         text primary key,                    -- 'contas' | 'dia:aaaa-mm-dd' | 'trava'
+  dados         jsonb not null default '{}'::jsonb,
+  atualizado_em timestamptz not null default now()
+);
+create table if not exists public.voo_mudancas (
+  id        bigint generated always as identity primary key,
+  org_id    text,
+  objeto_id text not null,                           -- id do conjunto (ou campanha CBO / anúncio) no Meta
+  conta_id  text,
+  tipo      text not null check (tipo in ('orcamento', 'pausar')),
+  user_id   uuid,
+  quando    timestamptz not null default now(),
+  antes     numeric,
+  depois    numeric,
+  ok        boolean not null default true
+);
+create index if not exists voo_mudancas_obj_idx on public.voo_mudancas (objeto_id, quando desc);
+alter table public.voo_cache enable row level security;
+alter table public.voo_mudancas enable row level security;
+revoke all on public.voo_cache, public.voo_mudancas from anon, authenticated;
+grant select, insert, update, delete on public.voo_cache, public.voo_mudancas to service_role;
+
+-- registro atômico de uma mudança de orçamento (histórico). Decisão do dono (25/11/2026): SEM limite por hora — a voo-acao
+-- passa p_limite = null e nada é recusado. p_limite > 0 (opcional) ainda limita por objeto na última hora; -1 = limite atingido.
+-- A função voo-acao marca ok=false se o Meta recusar.
+create or replace function public.voo_reservar_mudanca(p_org text, p_objeto text, p_conta text, p_user uuid, p_antes numeric, p_depois numeric, p_limite int)
+returns bigint language plpgsql security definer set search_path = public as $$
+declare n int; v_id bigint;
+begin
+  perform pg_advisory_xact_lock(hashtext('voo:' || p_objeto));
+  select count(*) into n from public.voo_mudancas
+   where objeto_id = p_objeto and tipo = 'orcamento' and ok and quando > now() - interval '1 hour';
+  if p_limite is not null and p_limite > 0 and n >= p_limite then return -1; end if;
+  insert into public.voo_mudancas (org_id, objeto_id, conta_id, tipo, user_id, antes, depois)
+  values (p_org, p_objeto, p_conta, 'orcamento', p_user, p_antes, p_depois) returning id into v_id;
+  return v_id;
+end $$;
+revoke execute on function public.voo_reservar_mudanca(text, text, text, uuid, numeric, numeric, int) from public, anon, authenticated;
+grant execute on function public.voo_reservar_mudanca(text, text, text, uuid, numeric, numeric, int) to service_role;
+
+-- =====================================================================================
+-- BACKUPS E AUDITORIA (docs/BACKUP-E-RESTAURACAO.md) — seção acrescentada; não altera as de cima.
+-- * Status dos backups e da auditoria em records 'backupStatus:<nativo|diario|externo|auditoria>' (card "Backups" do Cockpit).
+--   Leitura: só Dono/Admin — a coleção não está em col_modules (can_col exige o módulo admin) E está em receita_colecoes
+--   (quem não vê receita não recebe nem por ler_records/ler_record/realtime). Gravação: só o servidor (Edge Function
+--   backup-diario / SQL da auditoria); ninguém do app grava nem apaga.
+-- * Bucket privado `backups` do Storage: sem nenhuma política para anon/authenticated (só a service role acessa).
+-- =====================================================================================
+insert into public.receita_colecoes (col) values ('backupStatus') on conflict do nothing;
+
+create or replace function public.tg_backup_status_guard() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if public.e_servidor() then return coalesce(new, old); end if;
+  if (tg_op = 'DELETE' and old.col = 'backupStatus') or (tg_op <> 'DELETE' and (new.col = 'backupStatus' or new.id like 'backupStatus:%'))
+     or (tg_op = 'UPDATE' and old.col = 'backupStatus') then
+    raise exception 'O status dos backups só é gravado pelo servidor.' using errcode = '42501';
+  end if;
+  return coalesce(new, old);
+end $$;
+revoke execute on function public.tg_backup_status_guard() from public, anon, authenticated;
+drop trigger if exists records_backup_status_guard on public.records;
+create trigger records_backup_status_guard before insert or update or delete on public.records
+  for each row execute function public.tg_backup_status_guard();
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('backups', 'backups', false, 524288000, array['application/gzip', 'application/json'])
+on conflict (id) do update set public = false;
+
+-- Funções de gatilho não precisam (nem devem) ser executáveis por anon/authenticated (achado da auditoria de 25/11/2026).
+-- O gatilho continua funcionando: quem dispara é a tabela, não a permissão EXECUTE de quem grava.
+revoke execute on function public.tg_records_guard(), public.tg_users_sync_profile() from public, anon, authenticated;

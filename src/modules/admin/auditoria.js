@@ -17,7 +17,7 @@ export function filtrar(ctx) {
   const desde = per.dias ? Date.now() - per.dias * 864e5 : 0;
   return {
     per,
-    linhas: db.list('activity', a => (!query.pessoa || (query.pessoa === 'sistema' ? !a.quem : a.quem === query.pessoa)) && (!query.mod || modDaCol(a.col) === query.mod) && (!desde || new Date(a.quando).getTime() >= desde))
+    linhas: db.list('activity', a => (!query.pessoa || (query.pessoa === 'sistema' ? !a.quem : a.quem === query.pessoa)) && (!query.mod || modDaCol(a.col) === query.mod) && (!desde || new Date(a.quando).getTime() >= desde) && (query.outro !== '1' || a.deOutroGestor === true))
       .sort((a, b) => String(b.quando).localeCompare(String(a.quando))),
   };
 }
@@ -33,15 +33,16 @@ export function render(ctx) {
   const filtros = `<div class="m-adm-bar m-aud-f">
 ${sel('pessoa', 'Pessoa', [{ v: '', l: 'Todas' }, ...pessoas.map(p => ({ v: p.id, l: p.nome })), { v: 'sistema', l: 'Sistema (automático)' }], query.pessoa)}
 ${sel('mod', 'Módulo', [{ v: '', l: 'Todos' }, ...mods.map(m => ({ v: m, l: MOD_ROTULO[m] || m }))], query.mod)}
+${sel('outro', 'Tipo', [{ v: '', l: 'Todas as alterações' }, { v: '1', l: 'Alterações em clientes de outro gestor' }], query.outro)}
 <div class="m-adm-fl"><span>Período</span>${ui.seg(PERIODOS.map(p => ({ id: p.id, rotulo: p.rotulo })), per.id, { rotulo: 'Período' })}</div>
-${query.pessoa || query.mod || query.per ? ui.btn({ rotulo: 'Limpar filtros', sm: true, tipo: 'ghost', href: '#/admin/auditoria' }) : ''}</div>`;
+${query.pessoa || query.mod || query.per || query.outro ? ui.btn({ rotulo: 'Limpar filtros', sm: true, tipo: 'ghost', href: '#/admin/auditoria' }) : ''}</div>`;
   const pessoasNoFiltro = new Set(linhas.map(a => a.quem)).size;
   const tabela = ui.tabela({
     legenda: 'Registro de atividades', ordem: null,
     cols: [
       { k: 'quando', l: 'Quando', r: a => `<span class="num" title="${esc(fmt.dataHora(a.quando))}">${fmt.data(a.quando)} ${fmt.hora(a.quando)}</span><span class="sub">${esc(fmt.rel(a.quando))}</span>` },
       { k: 'quemNome', l: 'Pessoa', r: a => (a.quem ? `<span class="m-adm-pess">${ui.avatar(a.quem, 22)}<span>${esc(a.quemNome || (db.get('users', a.quem) || {}).nome || a.quem)}</span></span>` : `<span class="mut">${ui.ic('settings')} Sistema</span>`) },
-      { k: 'oque', l: 'Ação', r: a => esc(a.oque) },
+      { k: 'oque', l: 'Ação', r: a => `${esc(a.oque)}${a.deOutroGestor ? `<span class="sub t-warn" data-de-outro>${ui.ic('users')} Cliente de outro gestor (${esc(a.respNome || '—')})</span>` : ''}` },
       { k: 'col', l: 'Módulo', v: a => MOD_ROTULO[modDaCol(a.col)] || a.col, r: a => esc(MOD_ROTULO[modDaCol(a.col)] || a.col || '—') },
       { k: 'refId', l: 'Registro', mobile: false, v: a => nomeRef(db, a), r: a => { const h = linkRef(a.col, a.refId); const n = nomeRef(db, a); return a.refId ? (h ? `<a href="${esc(h)}" class="sm">${esc(n)}</a>` : `<span class="sm mut">${esc(n)}</span>`) : '<span class="mut">—</span>'; } },
     ],
@@ -66,7 +67,7 @@ export function mount(el, ctx) {
       const { linhas } = filtrar(ctx);
       const csv = paraCsv(linhas, [
         { l: 'Data', v: a => fmt.data(a.quando) }, { l: 'Hora', v: a => fmt.hora(a.quando) }, { l: 'Pessoa', v: a => a.quemNome || 'Sistema' },
-        { l: 'Ação', v: a => a.oque }, { l: 'Módulo', v: a => MOD_ROTULO[modDaCol(a.col)] || a.col }, { l: 'Coleção', v: a => a.col }, { l: 'Registro', v: a => nomeRef(ctx.db, a) }, { l: 'ID', v: a => a.refId || '' },
+        { l: 'Ação', v: a => a.oque }, { l: 'Cliente de outro gestor', v: a => (a.deOutroGestor ? `sim (responsável: ${a.respNome || ''})` : '') }, { l: 'Módulo', v: a => MOD_ROTULO[modDaCol(a.col)] || a.col }, { l: 'Coleção', v: a => a.col }, { l: 'Registro', v: a => nomeRef(ctx.db, a) }, { l: 'ID', v: a => a.refId || '' },
       ]);
       baixar(`auditoria-${fmt.iso(new Date())}.csv`, csv);
       ui.toast(`${fmt.plural(linhas.length, 'registro exportado', 'registros exportados')}.`);

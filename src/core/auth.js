@@ -135,7 +135,7 @@ export const auth = {
 
   /** tela de login; chama onOk() após entrar */
   renderLogin(root, onOk) {
-    const demo = this.demo;
+    const demo = this.demo && db.dadosDemo; // atalhos de login só existem com os usuários de exemplo
     const rapidos = [['Dono', 'gabriel', 'Gabriel Leão'], ['Head de tráfego', 'allan', 'Allan Vieira'], ['Gestor de tráfego', 'ana', 'Ana Souza'], ['CS', 'diego', 'Diego Melo'], ['Produção', 'carla', 'Carla Dias'], ['Financeiro', 'paulo', 'Paulo Reis']];
     const outros = [['Administrador', 'rayane', 'Rayane Leão'], ['Comercial', 'marina', 'Marina Costa'], ['Somente leitura', 'helena', 'Helena Prado']];
     const fr = fraseDoDia();

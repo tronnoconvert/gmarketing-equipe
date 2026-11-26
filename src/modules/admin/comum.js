@@ -51,7 +51,8 @@ const DEMO_PADRAO = { windsor: ['off', 'Não configurado', 'A conta de Campanha 
 export function statusDemo(it) {
   const torre = db.list('integrations', x => it.casa.test(String(x.nome || x.titulo || x.id || '')))[0];
   const salvo = (db.config('admin.integracoes', {}) || {})[it.id] || {};
-  let [estado, rotulo, detalhe] = DEMO_PADRAO[it.id];
+  // sem dados de exemplo (teste "produção vazia") não há estado simulado a mostrar: neutro até haver um registro real
+  let [estado, rotulo, detalhe] = db.dadosDemo ? DEMO_PADRAO[it.id] : ['off', 'Não verificado', 'Sem servidor neste ambiente.'];
   if (torre && torre.estado) { estado = torre.ativo === false ? 'off' : torre.estado; rotulo = estado === 'ok' ? 'Configurado' : estado === 'off' ? 'Desativado' : estado === 'warn' ? 'Atenção' : 'Com erro'; detalhe = torre.erro || torre.detalhe || torre.status || detalhe; }
   return { estado, rotulo, detalhe, verificadoEm: salvo.verificadoEm || null, configurado: estado !== 'off' };
 }

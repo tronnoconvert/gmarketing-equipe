@@ -156,11 +156,12 @@ ${ui.chips([{ id: 'todas', rotulo: 'Todas', n: todos.filter(x => x.data >= ini).
   const tl = l.length ? Object.entries(grupos).map(([m, it]) => `<section class="m-clientes-tlg"><h3>${fmt.esc(m)}</h3><ol class="m-clientes-tl">${it.map(x => {
     const imp = x.fonte === 'acao' ? K.impacto(x, c, rs) : null;
     const quem = x.origem === 'torre' ? `<span class="m-clientes-tav" style="--k:${COR_AREA.torre}" title="Torre de Controle">${ui.ic('radio-tower')}</span>` : x.quem ? ui.avatar(x.quem, 30) : `<span class="m-clientes-tav">${ui.ic('activity')}</span>`;
-    const nome = x.origem === 'torre' ? `Torre de Controle${x.aprovadoPor ? ` · aprovado por ${K.nomePessoa(x.aprovadoPor)}` : ''}` : (x.quem ? K.nomePessoa(x.quem) : x.quemNome || 'Sistema');
+    const nome = x.origem === 'torre' && x.autorNome ? `${x.autorNome} · pelo Painel de Voo` : x.origem === 'torre' ? `Torre de Controle${x.aprovadoPor ? ` · aprovado por ${K.nomePessoa(x.aprovadoPor)}` : ''}` : (x.quem ? K.nomePessoa(x.quem) : x.quemNome || 'Sistema');
     return `<li class="m-clientes-tli" style="--k:${COR_AREA[x.area] || 'var(--c4)'}">
 <div class="m-clientes-tlw">${quem}</div>
 <div class="m-clientes-tlc"><div class="m-clientes-tlh"><b>${fmt.esc(x.tipo)}</b><span class="m-clientes-tlarea">${ui.ic(ICO(x.tipo))}${fmt.esc(AREAS[x.area] || '')}</span><span class="mut sm">${fmt.esc(nome)} · ${fmt.data(x.data)}</span></div>
 <p>${fmt.esc(x.descricao)}</p>
+${x.deOutroGestor ? `<p class="sm t-warn" data-de-outro>${ui.ic('users')} ${fmt.esc(fmt.primeiro(x.autorNome || ''))} alterou ${x.metrica === 'Verba' ? 'a verba' : 'a conta'} — cliente de ${fmt.esc(fmt.primeiro(x.respNome || ''))}</p>` : ''}
 ${x.antes || x.depois ? `<p class="m-clientes-ad sm"><span class="mut">Antes</span> ${fmt.esc(x.antes || '—')} <span aria-hidden="true">→</span><span class="sr">depois</span> <b>${fmt.esc(x.depois || '—')}</b></p>` : ''}
 ${x.expectativa ? `<p class="sm mut">Expectativa: ${fmt.esc(x.expectativa)}</p>` : ''}
 ${x.resultado || imp ? `<p class="m-clientes-res sm">${imp && !imp.pendente && imp.pct != null ? `${ui.delta(`${(K.METRICAS[imp.k].melhor === 'menor' ? imp.pct <= 0 : imp.pct >= 0) ? '▲' : '▼'} ${fmt.pct(Math.abs(imp.pct), 1)} ${K.METRICAS[imp.k].curta}`, Math.abs(imp.pct) < 1 ? null : imp.pct > 0)} ` : imp && imp.pendente ? `<span class="mut">Efeito medido em ${fmt.plural(imp.faltam, 'dia')}${x.resultado ? ' · ' : ''}</span>` : ''}${x.resultado ? fmt.esc(x.resultado) : ''}</p>` : ''}

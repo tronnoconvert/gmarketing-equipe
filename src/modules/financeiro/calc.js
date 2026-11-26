@@ -109,7 +109,7 @@ export function ponte(periodo = 'mes') {
 }
 
 /* ---------- clientes / rentabilidade ---------- */
-export function mrrCliente(id) { const c = db.get('clients', id); if (c && typeof c.mrr === 'number') return c.mrr; const k = CLIENTES.find(x => x.id === id); return k ? k.mrr : 0; }
+export function mrrCliente(id) { const c = db.get('clients', id); if (c && typeof c.mrr === 'number') return c.mrr; const k = db.dadosDemo && CLIENTES.find(x => x.id === id); return k ? k.mrr : 0; }
 export function concentracao() {
   const lst = CLIENTES.map(c => ({ id: c.id, nome: nomeCliente(c.id) || c.nome, mrr: mrrCliente(c.id) })).sort((a, b) => b.mrr - a.mrr);
   const total = lst.reduce((a, c) => a + c.mrr, 0) + OUTROS.mrr;

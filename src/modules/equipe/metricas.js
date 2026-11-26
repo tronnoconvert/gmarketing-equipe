@@ -16,7 +16,7 @@ export function horasNaJanela(teamId, dias, pred) {
 export function clientesResp(teamId) {
   const db0 = db.list('clients');
   if (db0.length) return db0.filter(c => c.respId === teamId && c.ativo !== false).map(c => cliente(c.id));
-  return CLIENTES_IDS.map(cliente).filter(c => c.respId === teamId);
+  return db.dadosDemo ? CLIENTES_IDS.map(cliente).filter(c => c.respId === teamId) : [];
 }
 /** carteira = clientes em que a pessoa trabalha (teamStats.carteira) + os sob responsabilidade */
 export function carteira(teamId) {
@@ -70,7 +70,7 @@ export function metricasTime() {
 }
 /** faixa do time para um indicador: {min, max, media} */
 export function faixaTime(ms, k) { const v = ms.map(m => m[k]).filter(x => x != null && !isNaN(x)); if (!v.length) return null; return { min: Math.min(...v), max: Math.max(...v), media: media(v) }; }
-export function mrrTotal() { const l = db.list('clients', c => c.ativo !== false && c.mrr); return l.length ? l.reduce((a, c) => a + Number(c.mrr || 0), 0) : 186400; }
+export function mrrTotal() { const l = db.list('clients', c => c.ativo !== false && c.mrr); return l.length ? l.reduce((a, c) => a + Number(c.mrr || 0), 0) : (db.dadosDemo ? 186400 : 0); }
 /** pessoas que veem só o próprio perfil */
 export const soProprio = user => perms.escopo('equipe', user) === 'proprio';
 export { diasPara };

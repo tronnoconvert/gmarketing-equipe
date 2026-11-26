@@ -61,7 +61,7 @@ const clientes = [
   E('clientes', 'Sinais de risco (motivos na ficha)', 'decisor.critico', 'Decisor sem responder (crítico)', 10, 'dias', { editavel: true, min: 1, max: 90, passo: 1, maiorQue: 'clientes.decisor.atencao',
     significa: 'Dias sem resposta do decisor que deixam o motivo em vermelho.', calculo: '≥ 10 dias → vermelho.', ondeUsa: ['Clientes › ficha › motivos de risco'], link: '#/clientes/c-orion' }),
   E('clientes', 'Sinais de risco (motivos na ficha)', 'health.quedaMotivo', 'Queda do health que vira motivo', 10, 'pts', { editavel: true, min: 1, max: 50, passo: 1,
-    significa: 'Queda do health em 30 dias que aparece como motivo de risco ("Health score caiu 22 pts em 30 dias").',
+    significa: 'Queda do health em 30 dias que aparece como motivo de risco ("Health score caiu 20 pts em 30 dias").',
     calculo: 'Variação de 30 dias ≤ −10 pts → motivo vermelho.', ondeUsa: ['Clientes › ficha › motivos de risco'], link: '#/clientes/c-orion' }),
   E('clientes', 'Sinais de risco (motivos na ficha)', 'inadimplente', 'Inadimplente', 'Fatura do cliente em atraso', 'texto', {
     significa: 'Cliente com pagamento vencido e não pago. Entra no filtro "Inadimplentes" e vira motivo de risco.',

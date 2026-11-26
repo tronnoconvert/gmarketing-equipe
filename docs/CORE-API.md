@@ -52,7 +52,9 @@ db.on((col, op, obj) => …) -> unsubscribe   // op: insert|update|remove|batch|
 db.batch(() => { … })                       // várias escritas, um evento
 db.config(chave, padrao) · db.setConfig(chave, valor)   // coleção settings {id: chave, valor}
 db.mode 'demo'|'supabase' · db.reset() (demo: apaga e ressemeia, recarrega)
+db.dadosDemo                                 // true SÓ quando há dados de exemplo (modo demonstração). Ver abaixo.
 ```
+- **Dados de exemplo × produção (`db.dadosDemo`)**: sementes (`db.seed`) e snapshots/constantes de demonstração (ex.: `cockpit/data.js`, séries de `financeiro/data.js`, `HISTORICO` do Comercial, `CLIENTES_BASE`/`FATURAVEIS` da Operação) só valem com `db.dadosDemo === true`. Produção (Supabase com `seedDemo:false`) → `false`: o módulo calcula das coleções reais e, sem dado, mostra estado vazio que ensina o próximo passo — **nunca** número fictício. Teste "produção vazia": build demo + `AOS_CONFIG.seedDemo = false` (LocalAdapter sem sementes, chave `aos-db-v1-vazio`) — `tests/producao-vazia.spec.mjs`. Não use `db.mode` para isso (`db.mode` diz só se há servidor).
 - `insert` gera `id` (`cli-…`), `createdAt` (ISO), `createdBy` (usuário real). `update` grava `updatedAt/updatedBy`. `insert` com id existente substitui (use para **Desfazer** um `remove`).
 - `{log: 'alterou MRR'}` grava em `activity` `{quem, quemNome, oque, col, refId, quando}`.
 - Coleções: `users, team, clients, contacts, contracts, services, healthHistory, deliveries, tasks, invoices, payables, cash, deals, routines, routineRuns, integrations, alerts, alertRules, notifications, comments, activity, webinars, campaignAccount, campaignDaily, campaigns, onboarding, meetings, timeEntries, goals, settings` (+ coleções de módulos; `relatorios` = relatório semanal do gestor de tráfego `{id, clientId, semana:'2026-W48', enviadoPor, quando}`).
@@ -73,7 +75,7 @@ perms.escopoClientes() -> 'todos' | [clientIds] · perms.podeCliente(id) · perm
 perms.PAPEIS (rótulo + descrição) · perms.MODULOS_PERM · perms.matriz() · perms.salvarMatriz(m) · perms.restaurarPadrao() · perms.rotuloPapel(p)
 ```
 Matriz (PLAN §5) em `settings.perms` como `{mod: {papel: 'editar:seus'}}`. Chaves: `mesa cockpit financeiro clientes operacao equipe torre torre_voo comercial alertas webinars campanha notificacoes admin receita padroes`.
-Papéis (colunas): `dono admin head_trafego gestor_trafego cs producao financeiro comercial leitura`. **Regra permanente do dono:** o que é só do Dono vale igual para o Admin (Rayane Leão) — Campanha e Receita = `admin` para os dois. `head_trafego` (Allan Vieira) = tudo do gestor de tráfego em todas as contas (clientes `editar`, torre/torre_voo `editar`, alertas `ver`) + `padroes` editar; sem receita, cockpit, financeiro nem Campanha.
+Papéis (colunas): `dono admin head_trafego gestor_trafego cs producao financeiro comercial leitura`. **Regra permanente do dono:** o que é só do Dono vale igual para o Admin (Rayane Leão) — Campanha e Receita = `admin` para os dois. `head_trafego` (Allan Vieira) = tudo do gestor de tráfego em todas as contas (clientes `editar`, torre/torre_voo `editar`, alertas `ver`) + `padroes` editar; sem receita, cockpit, financeiro nem Campanha. `gestor_trafego` (decisão do dono, 25/11/2026): clientes e torre_voo `editar` em TODOS os clientes (cobre colega ausente; Painel de Voo e Clientes abrem no filtro "Meus" com alternância "Meus / Todos"; contas sem cliente vinculado continuam só Dono/Admin/Head), nunca vê receita. `perms.meusClientes()` = ids dos clientes da pessoa.
 **Decisão:** `excluir` exige nível `admin` no módulo, ou papel dono/admin com `editar`. `editar:seus`/`ver:proprio` → o módulo filtra os dados com `perms.escopo(mod)`/`escopoClientes()`.
 
 ## 5. router
@@ -190,7 +192,7 @@ export default async function (t) {
 ## Decisões e desvios do PLAN §4
 - Contrato do módulo usa `titulo/icone/grupo/rota` (aceita `title/icon`), mais `sub`, `perm`, `watch`, `contador`, `busca`.
 - `ctx.periodo` é o id (`'mes'|'tri'|'12m'`); detalhes em `ctx.periodoInfo`.
-- Torre: permissões separadas `torre` (Rotinas) e `torre_voo` (Painel de Voo); placeholder já traz o submenu e o iframe (`ui.embed`). No arquivo único, sem a pasta `torre/` ao lado, mostra estado vazio.
+- Torre: permissões separadas `torre` (Rotinas) e `torre_voo` (Painel de Voo). **Painel de Voo nativo (item 17)**: `src/modules/torre/voo.js` (telas), `voo-modelo.js` (pacote → contas, janelas, semáforo, motor de recomendações, frases), `voo-fonte.js` (produção: Edge Functions `voo-dados`/`voo-acao`; demonstração: `voo-demo.js`, dados fictícios no mesmo formato), `window.AOS_VOO` (testes). Campos novos em `clients`: `metaContas: ['<id da conta>']` (+ `metaAdAccountId` = `act_` da 1ª, usado pelo Guardião) e `metaCustoConversa` (R$). Ações gravam `clientActions` com `origem:'torre'`, `contaMeta`, `objetoId`; decisões do motor em `recsLog` com `origem:'torre'`, `conta`.
 - `db.seed(..., {chave})` permite várias sementes na mesma coleção; apagar todos os registros não ressemeia.
 - `excluir` segue a regra da seção 4. Notificações têm a linha `notificacoes` (todos editam as próprias).
 - Gráficos são redesenhados na largura real do contêiner (texto nunca encolhe no celular).

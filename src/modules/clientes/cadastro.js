@@ -1,5 +1,6 @@
 // cadastro.js — aba "Cadastro" (todos os campos do §7, edição com validação e Desfazer) e #/clientes/novo (cadastro em etapas).
 import * as K from './calc.js';
+import { auth } from '../../core/auth.js';
 import { HOJE, SEMANAS, NSEM, PESOS } from './data.js';
 import { agendarReuniao } from './ficha.js';
 import { comissoesEditor, lerComissoes, limparChavesCm, regrasComissoes, errosComissao, notificarComissoes, cardComissoes, mountComissoes } from './comissoes.js';
@@ -65,7 +66,7 @@ export function abaCadastro(ctx, c) {
 <div class="g2">${ui.card({ titulo: 'Dados', icone: 'building', corpo: `<div class="row" style="margin-bottom:12px">${logoMini(c)}<span class="sm mut">Logo (cor de identificação)</span></div>${ui.pares([['Nome fantasia', fmt.esc(c.nome)], ['Razão social', fmt.esc(c.razaoSocial)], ['CNPJ', `<span class="num">${fmt.esc(c.cnpj)}</span>`], ['Segmento', fmt.esc(c.segmento)], ['Cidade', fmt.esc(c.cidade || '—')], ['Cliente desde', fmt.data(c.desde)]])}` })}
 ${ui.card({ titulo: 'Contatos', icone: 'users', corpo: dc.length ? ui.pares(dc, { colunas: 2 }) : ui.vazio({ titulo: 'Nenhum contato', compacto: true }) })}</div>
 <div class="g2">${ui.card({ titulo: 'Contrato', icone: 'file', corpo: ui.pares([['Início', fmt.data(ctr.inicio || c.desde)], ...(K.veReceita() ? [['MRR', fmt.brl(c.mrr)]] : []), ['Índice de reajuste', `${fmt.esc(ctr.indice || '—')}${ctr.reajustePct ? ` · ${fmt.pct(ctr.reajustePct)}` : ''}`], ['Data do reajuste', fmt.data(ctr.reajusteData)], ['Fidelidade', ctr.fidelidadeMeses ? `${ctr.fidelidadeMeses} meses` : 'Sem fidelidade'], ['Renovação', `${fmt.data(c.renova)} · ${ctr.renovacaoAuto === false ? 'manual' : 'automática'}`], ['Contrato (PDF)', ctr.pdf ? `<span class="row">${ui.ic('file')}${fmt.esc(ctr.pdf)}</span>` : '—']]) })}
-${ui.card({ titulo: 'Serviços e metas', icone: 'target', corpo: `<div class="m-clientes-tags">${(c.servicos || []).map(s => `<span>${fmt.esc(s)}</span>`).join('')}</div>${ui.pares([['ROAS', m.roas != null ? fmt.dec(m.roas, 1) : '—'], ['CPL', m.cpl != null ? fmt.brl2(m.cpl) : '—'], ['Leads/mês', m.leadsMes != null ? fmt.num(m.leadsMes) : '—'], ['Faturamento/mês', m.faturamento != null ? fmt.brl(m.faturamento) : '—'], ['Teto de mídia', tetoTexto(ctx, c.tetoMidiaMensal)]])}` })}</div>
+${ui.card({ titulo: 'Serviços e metas', icone: 'target', corpo: `<div class="m-clientes-tags">${(c.servicos || []).map(s => `<span>${fmt.esc(s)}</span>`).join('')}</div>${ui.pares([['ROAS', m.roas != null ? fmt.dec(m.roas, 1) : '—'], ['CPL', m.cpl != null ? fmt.brl2(m.cpl) : '—'], ['Leads/mês', m.leadsMes != null ? fmt.num(m.leadsMes) : '—'], ['Faturamento/mês', m.faturamento != null ? fmt.brl(m.faturamento) : '—'], ['Teto de mídia', tetoTexto(ctx, c.tetoMidiaMensal)], ['Meta de custo por conversa', c.metaCustoConversa ? fmt.brl2(c.metaCustoConversa) : '<span class="mut">Não informada</span>'], ['Contas Meta Ads', contasMetaTexto(ctx, c)]])}` })}</div>
 ${K.veReceita() ? cardComissoes(ctx, c, pode) : ''}
 <div class="g-2-1">${ui.card({ titulo: 'Acessos', icone: 'key', ajuda: 'LED de conexão de cada acesso: verde conectado, âmbar atenção (permissão expirando, dados faltando), vermelho com erro, cinza pendente/pausado. "Testar conexão" verifica na hora.', corpo: (c.acessos || []).length ? acc : ui.vazio({ titulo: 'Nenhum acesso cadastrado', compacto: true }) })}
 ${ui.card({ titulo: 'Responsável interno', icone: 'user', corpo: `<div class="row" style="flex-wrap:nowrap">${ui.avatar(c.respId, 36)}<div><b>${fmt.esc(K.nomePessoa(c.respId))}</b><div class="sm mut">${fmt.esc((K.pessoa(c.respId) || {}).cargo || '')}</div></div></div><p class="sm mut" style="margin:14px 0 6px">Equipe do cliente</p><div class="m-clientes-eq">${(c.equipe || []).map(id => `<span class="row" style="flex-wrap:nowrap">${ui.avatar(id, 24)}<span class="sm">${fmt.esc(K.nomePessoa(id))}</span></span>`).join('')}</div>` })}</div>
@@ -90,7 +91,8 @@ ${K.veReceita() ? fsec('Comissão variável', `<p class="fld-d m-clientes-cmd">V
 ${fsec('Serviços', `<div class="m-clientes-svs" role="group" aria-label="Serviços contratados">${SERVICOS.map(s => `<label class="ck"><input type="checkbox" name="servicos" value="${fmt.esc(s)}"${(c.servicos || []).includes(s) ? ' checked' : ''}><span>${fmt.esc(s)}</span></label>`).join('')}</div>`, 'sec-servicos')}
 ${fsec('Metas', `<div class="fgrid">${ui.campo({ nome: 'm-roas', rotulo: 'ROAS', tipo: 'number', valor: m.roas ?? '', attrs: { step: '0.1', min: '0' }, placeholder: 'Ex.: 3,0' })}${ui.campo({ nome: 'm-cpl', rotulo: 'CPL', tipo: 'moeda', valor: m.cpl ?? '' })}
 ${ui.campo({ nome: 'm-leads', rotulo: 'Leads por mês', tipo: 'number', valor: m.leadsMes ?? '', attrs: { min: '0' } })}${ui.campo({ nome: 'm-fat', rotulo: 'Faturamento por mês', tipo: 'moeda', valor: m.faturamento ?? '' })}
-${campoTeto(ctx, c.tetoMidiaMensal, (c.servicos || []).some(x => x === 'Tráfego' || x === 'Google'))}</div>`, 'sec-metas')}
+${campoTeto(ctx, c.tetoMidiaMensal, (c.servicos || []).some(x => x === 'Tráfego' || x === 'Google'))}
+${camposMeta(ctx, c)}</div>`, 'sec-metas')}
 ${fsec('Acessos', `<ul class="m-clientes-accs" id="m-clientes-accs">${(c.acessos || []).map((a, i) => acessoLinha(ctx, a, i, true)).join('')}</ul><input type="hidden" name="acessos" value="${fmt.esc(JSON.stringify(c.acessos || []))}">
 <div class="row m-clientes-addacc"><input type="text" id="m-clientes-novoacc" placeholder="Novo acesso, ex.: TikTok Ads" aria-label="Nome do novo acesso">${ui.btn({ rotulo: 'Adicionar', icone: 'plus', sm: true, attrs: { 'data-add-acc': '' } })}</div>`, 'sec-acessos')}
 ${fsec('Responsável interno', `<div class="fgrid">${ui.campo({ nome: 'respId', rotulo: 'Responsável', tipo: 'select', opcoes: time.map(t => ({ v: t.id, l: `${t.nome} · ${t.area}` })), valor: c.respId, obrigatorio: true })}</div>
@@ -100,6 +102,27 @@ ${fsec('Responsável interno', `<div class="fgrid">${ui.campo({ nome: 'respId', 
   const barra = `<div class="m-clientes-savebar" role="region" aria-label="Salvar cadastro"><span class="sm mut" id="m-clientes-dirty">${edicao.sujo ? 'Alterações não salvas' : 'Nenhuma alteração ainda'}</span><div class="row">${ui.btn({ rotulo: 'Cancelar', attrs: { 'data-cancelar': '' } })}${ui.btn({ rotulo: 'Salvar cadastro', icone: 'check', tipo: 'pri', attrs: { 'data-salvar': '' } })}</div></div>`;
   return `${ui.card({ titulo: 'Editar cadastro', sub: c.nome, corpo: `${nav}${form}` })}${barra}
 ${ui.card({ titulo: 'Histórico', icone: 'clock', corpo: hist })}`;
+}
+/* ---------- Painel de Voo (item 17): contas Meta Ads do cliente e meta de custo por conversa ---------- */
+/** só Dono, Admin e Head de Tráfego vinculam contas Meta (o gestor vê) */
+export const podeContasMeta = () => ['dono', 'admin', 'head_trafego'].includes((auth.user() || {}).papel) && !auth.vendoComo();
+export function contasMetaTexto(ctx, c) {
+  const l = (c.metaContas || []).map(x => `act_${String(x).replace(/\D/g, '')}`);
+  return l.length ? l.map(x => `<a class="num" href="#/torre/voo/${x.slice(4)}">${ctx.fmt.esc(x)}</a>`).join(', ') : '<span class="mut">Nenhuma vinculada</span>';
+}
+/** "act_1, 2" → {ok, metaContas: ['1','2'], metaAdAccountId: 'act_1'} */
+export function lerContasMeta(txt) {
+  const partes = String(txt || '').split(/[\s,;]+/).map(x => x.trim()).filter(Boolean);
+  const ids = partes.map(x => x.replace(/^act_/i, ''));
+  const ok = ids.every(x => /^\d{5,25}$/.test(x));
+  const u = [...new Set(ids)];
+  return { ok, metaContas: u, metaAdAccountId: u[0] ? `act_${u[0]}` : null };
+}
+function camposMeta(ctx, c) {
+  const { ui } = ctx; const v = (c.metaContas || []).map(x => `act_${String(x).replace(/\D/g, '')}`).join(', ');
+  const contas = podeContasMeta() ? ui.campo({ nome: 'metaContas', rotulo: 'Contas de anúncios (Meta)', valor: v, placeholder: 'act_1234567890', ajuda: 'ID da conta de anúncios do Meta (act_…). Separe várias por vírgula. Liga o cliente ao Painel de Voo: o gestor responsável passa a ver a conta.', dica: 'Só Dono, Admin e Head de Tráfego alteram.' })
+    : `<div class="fld"><b class="sm">Contas de anúncios (Meta)</b><p class="sm">${contasMetaTexto(ctx, c)}</p><p class="sm mut">Quem vincula: Dono, Admin ou Head de Tráfego.</p></div>`;
+  return `${ui.campo({ nome: 'metaCustoConversa', rotulo: 'Meta de custo por conversa', tipo: 'moeda', valor: c.metaCustoConversa ?? '', ajuda: 'Quanto o cliente aceita pagar por conversa iniciada no WhatsApp/Direct. O semáforo do Painel de Voo compara o custo real com esta meta.' })}${contas}`;
 }
 /** "R$ 45.000/mês · ≈ R$ 1.480/dia" ou "Não informado" */
 export function tetoTexto(ctx, v) {
@@ -150,6 +173,7 @@ export function validarCadastro(ctx, f, c) {
     servicos: [v => (!v || !v.length ? 'Marque pelo menos um serviço.' : '')],
     'm-roas': [v => (v != null && (v < 0 || v > 50) ? 'ROAS entre 0 e 50.' : '')],
     tetoMidiaMensal: [v => (v != null && v < 0 ? 'Informe um valor positivo ou deixe em branco.' : '')],
+    metaContas: [v => (!v || lerContasMeta(v).ok ? '' : 'Use o ID da conta de anúncios, ex.: act_1234567890 (separe várias por vírgula).')],
     ...regrasComissoes(f),
   };
   f.querySelectorAll('.m-clientes-ctb').forEach(b => { const i = b.dataset.ct; regras[`ct-nome-${i}`] = 'obrigatorio|min:3'; });
@@ -174,6 +198,8 @@ export async function salvarCadastro(ctx, el, c) {
     mrr: K.veReceita() ? d.mrr : antes.cliente.mrr, ...(K.veReceita() ? { mrrPendente: false } : {}), renova: d.renova, servicos: d.servicos || [], respId: d.respId, equipe: [...new Set([d.respId, ...(d.equipe || [])])], acessos,
     metas: { roas: d['m-roas'] ?? null, cpl: d['m-cpl'] ?? null, leadsMes: d['m-leads'] ?? null, faturamento: d['m-fat'] ?? null },
     tetoMidiaMensal: d.tetoMidiaMensal > 0 ? d.tetoMidiaMensal : null,
+    metaCustoConversa: d.metaCustoConversa > 0 ? d.metaCustoConversa : null,
+    ...(podeContasMeta() ? (({ metaContas, metaAdAccountId }) => ({ metaContas, metaAdAccountId }))(lerContasMeta(d.metaContas)) : {}),
     ...(K.veReceita() ? { comissoes: lerComissoes(f, d) } : {}),
   };
   const novos = lerContatos(f, d, c.id);

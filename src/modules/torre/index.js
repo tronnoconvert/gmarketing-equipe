@@ -1,9 +1,9 @@
-// Torre de Controle › Rotinas e integrações (docs/spec-dono.md §4) + Painel de Voo (iframe, preservado do placeholder).
+// Torre de Controle › Rotinas e integrações (docs/spec-dono.md §4) + Painel de Voo nativo (voo.js, item 17).
 import './data.js';
 import { db } from '../../core/store.js';
 import * as fmtc from '../../core/fmt.js';
 import { perms } from '../../core/perms.js';
-import { renderVoo, mountVoo } from './voo.js';
+import { renderVoo, mountVoo, buscaVoo } from './voo.js';
 import { ROT_ESTADO, rodando, onRodando, rodar, pausar, retomar, reconectar, testar, falhasTorre } from './engine.js';
 
 // rotinas de dinheiro que entra (MRR, conciliação de recebimentos, cobrança): só quem vê receita
@@ -129,12 +129,14 @@ function paginaRotinas(ctx) {
   const integs = db.list('integrations');
   const geral = todas.some(r => r.estado === 'err') || integs.some(i => i.estado === 'err') ? 'err' : todas.some(r => r.estado === 'warn') || integs.some(i => i.estado === 'warn') ? 'warn' : 'ok';
   const seg = Math.max(0, Math.round((Date.now() - ultimaVerif) / 1000));
-  const meta = `${ui.led(geral, { ok: 'Tudo operando', warn: 'Há pontos de atenção', err: 'Há falhas que exigem ação' }[geral])}<span class="m-torre-upd" aria-live="off">atualizado <span data-upd>${seg < 5 ? 'agora' : `há ${seg} s`}</span></span>${ui.ajuda('A Torre verifica todas as rotinas e integrações a cada 30 s nesta tela (a rotina "Torre de Controle" roda a cada 5 min no servidor).')}`;
+  const nada = !todas.length && !integs.some(i => i.ativo !== false); // sem rotina nem integração: estado neutro, não "Tudo operando"
+  const meta = `${nada ? ui.led('off', 'Sem rotinas configuradas') : ui.led(geral, { ok: 'Tudo operando', warn: 'Há pontos de atenção', err: 'Há falhas que exigem ação' }[geral])}<span class="m-torre-upd" aria-live="off">atualizado <span data-upd>${seg < 5 ? 'agora' : `há ${seg} s`}</span></span>${ui.ajuda('A Torre verifica todas as rotinas e integrações a cada 30 s nesta tela (a rotina "Torre de Controle" roda a cada 5 min no servidor).')}`;
   const acoes = `${ui.btn({ rotulo: 'Configurar alertas', icone: 'sliders', href: '#/alertas/regras' })}${ui.btn({ rotulo: 'Nova rotina', icone: 'plus', tipo: 'pri', attrs: { 'data-nova-rotina': '' }, disabled: !pode, title: pode ? 'Cadastrar uma nova rotina automática' : SEM_PERM })}`;
   const falha = todas.find(r => r.estado === 'err');
   const avisoFalha = falha ? ui.aviso({ tipo: 'err', titulo: `${falha.nome} falhou${falha.falhas > 1 ? ` ${falha.falhas}×` : ''}. ${falha.guia ? falha.guia.titulo : ''}`, texto: falha.guia ? falha.guia.texto : (falha.erro || ''), acao: `${falha.guia && falha.guia.integ && pode ? ui.btn({ rotulo: 'Reconectar', icone: 'refresh', sm: true, tipo: 'pri', attrs: { 'data-reconectar': falha.guia.integ } }) : ''}${ui.btn({ rotulo: 'Ver log', sm: true, href: `#/torre/rotina/${falha.id}` })}` }) : '';
   const cab = `<div class="m-torre-hd" aria-hidden="true"><span>Rotina</span><span>Última · próxima</span><span>Sucesso 30d ${''}</span><span>Histórico 30 dias</span><span>Resp. · frequência</span><span></span></div>`;
   const corpoLista = lista.length ? `${cab}<ul class="m-torre-rl">${lista.map(r => linhaRotina(r, ctx)).join('')}</ul>`
+    : !todas.length ? ui.vazio({ icone: 'radio-tower', titulo: 'Nenhuma rotina configurada', texto: 'Rotinas são tarefas automáticas da agência — sincronizar leads, gerar relatórios, cobrar faturas. Cadastre a primeira para a Torre acompanhar cada execução.', acao: pode ? { rotulo: 'Nova rotina', icone: 'plus', attrs: { 'data-nova-rotina': '' } } : undefined, compacto: true })
     : ui.vazio({ icone: 'check-circle', titulo: f === 'err' ? 'Nenhuma rotina com falha' : 'Nenhuma rotina neste filtro', texto: f === 'err' ? 'Tudo rodando. Quando algo falhar, aparece aqui com o que fazer.' : 'Escolha outro filtro para ver as demais rotinas.', acao: { rotulo: 'Ver todas', href: ctx.router.href(null, { f: null }) }, compacto: true });
   const chips = ui.chips(FILTROS.map(x => ({ ...x, n: x.id === 'todas' ? todas.length : todas.filter(r => r.estado === x.id).length })), f, 'f', { rotulo: 'Filtrar rotinas por estado' });
   return `<div class="pg m-torre">
@@ -257,11 +259,11 @@ export default {
   icone: 'radio-tower',
   grupo: 'trafego',
   rota: 'torre',
-  routes: ['torre', 'torre/voo', 'torre/rotina/:id'],
-  watch: ['routines', 'routineRuns', 'integrations', 'team', 'relatorios', 'clients'],
+  routes: ['torre', 'torre/voo', 'torre/voo/:conta', 'torre/rotina/:id'],
+  watch: ['routines', 'routineRuns', 'integrations', 'team', 'relatorios', 'clients', 'clientActions', 'recsLog', 'alerts', 'settings'],
   sub: [
     { id: 'rotinas', titulo: 'Rotinas e integrações', rota: 'torre', perm: 'torre' },
-    { id: 'voo', titulo: 'Painel de Voo', rota: 'torre/voo', perm: 'torre_voo' },
+    { id: 'voo', titulo: 'Painel de Voo', rota: 'torre/voo', perm: 'torre_voo', prefixo: true },
   ],
   contador() {
     const f = falhasTorre();
@@ -271,17 +273,15 @@ export default {
     const N = s => fmtc.norm(s || '');
     const r = db.list('routines', x => rotVisivel(x) && (N(x.nome).includes(q) || N(x.desc).includes(q))).map(x => ({ tipo: 'Rotinas', titulo: x.nome, sub: `${ROT_ESTADO[x.estado]} · ${x.freq}`, href: `#/torre/rotina/${x.id}`, led: x.estado, icone: 'radio-tower' }));
     const i = db.list('integrations', x => N(x.nome).includes(q) || N('integracao').includes(q)).map(x => ({ tipo: 'Integrações', titulo: x.nome, sub: x.status, href: '#/torre', led: x.estado, icone: 'link' }));
-    return [...r, ...i];
+    return [...r, ...i, ...buscaVoo(q)];
   },
   render(ctx) {
-    if (ctx.path === 'torre/voo') {
-      return renderVoo(ctx);
-    }
+    if (ctx.path === 'torre/voo' || ctx.path.startsWith('torre/voo/')) return renderVoo(ctx);
     if (ctx.params && ctx.params.id && ctx.path.startsWith('torre/rotina/')) return paginaLog(ctx);
     return paginaRotinas(ctx);
   },
   mount(el, ctx) {
-    if (ctx.path === 'torre/voo') return mountVoo(el, ctx);
+    if (ctx.path === 'torre/voo' || ctx.path.startsWith('torre/voo/')) return mountVoo(el, ctx);
     const onClick = e => {
       const b = e.target.closest('[data-rodar],[data-pausar],[data-retomar],[data-reconectar],[data-testar],[data-nova-rotina]');
       if (!b || b.disabled) return;

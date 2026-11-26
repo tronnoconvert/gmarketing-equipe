@@ -11,21 +11,25 @@ export function renderLista(ctx) {
   const { ui, charts, fmt, db, query } = ctx;
   const todos = K.visiveis();
   const k = K.kpis(todos);
-  const f = K.FILTROS.find(x => x.id === query.f) || K.FILTROS[0];
+  const f = K.filtroAtual(query.f);
   const q = fmt.norm(query.q || '').trim();
   let linhas = todos.filter(f.fn);
   if (q) linhas = linhas.filter(c => fmt.norm(`${c.nome} ${c.razaoSocial} ${c.segmento} ${(c.servicos || []).join(' ')} ${c.cnpj}`).includes(q) || (q.replace(/\D/g, '').length >= 4 && String(c.cnpj).replace(/\D/g, '').includes(q.replace(/\D/g, ''))));
   const podeEditar = ctx.can('clientes', 'editar');
   const escopo = ctx.escopoClientes();
   const rec = K.veReceita();
+  // séries históricas, churn e safras de referência são do modo demonstração; produção calcula do cadastro real
+  const D = db.dadosDemo, serieOk = escopo === 'todos' && D;
+  const churn = D ? null : churnReal(db);
 
   const kpis = `<div class="g-kpi m-clientes-kpis">
-${ui.kpi({ rotulo: 'Clientes ativos', valor: fmt.num(k.n), delta: k.novosMes ? `▲ ${k.novosMes}` : '0', comp: 'no mês', serie: escopo === 'todos' ? KPI_SERIES.ativos : null, ajuda: 'Clientes com contrato vigente (inclui os que estão em onboarding). Variação = entradas no mês.', href: '#/clientes' })}
-${ui.kpi({ rotulo: 'Health médio', valor: k.healthMedio == null ? '—' : String(k.healthMedio), delta: escopo === 'todos' ? `▼ ${Math.abs(CARTEIRA_REF.healthDelta)} pts` : null, deltaBom: false, comp: 'vs outubro', serie: escopo === 'todos' ? KPI_SERIES.health : null, ajuda: 'Média simples do health score (0–100) dos clientes ativos. Faixas: ≥75 saudável · 60–74 atenção · <60 em risco.', led: K.estH(k.healthMedio) })}
-${rec ? ui.kpi({ rotulo: 'Em risco', valor: String(k.risco.length), delta: fmt.brlK(k.mrrRisco), deltaBom: null, comp: `de MRR · ${fmt.pct(k.pctRisco)} do total`, serie: escopo === 'todos' ? KPI_SERIES.risco : null, formatoSerie: 'mil', alerta: k.risco.length > 0, ajuda: 'Clientes com health score abaixo de 60. O valor é a soma do MRR deles (MRR em risco).', href: ctx.router.href('clientes', { f: 'risco' }) })
+${ui.kpi({ rotulo: 'Clientes ativos', valor: fmt.num(k.n), delta: k.novosMes ? `▲ ${k.novosMes}` : '0', comp: 'no mês', serie: serieOk ? KPI_SERIES.ativos : null, ajuda: 'Clientes com contrato vigente (inclui os que estão em onboarding). Variação = entradas no mês.', href: '#/clientes' })}
+${ui.kpi({ rotulo: 'Health médio', valor: k.healthMedio == null ? '—' : String(k.healthMedio), delta: serieOk ? `▼ ${Math.abs(CARTEIRA_REF.healthDelta)} pts` : null, deltaBom: false, comp: serieOk ? 'vs outubro' : (k.healthMedio == null ? 'sem clientes ativos' : 'carteira atual'), serie: serieOk ? KPI_SERIES.health : null, ajuda: 'Média simples do health score (0–100) dos clientes ativos. Faixas: ≥75 saudável · 60–74 atenção · <60 em risco.', led: K.estH(k.healthMedio) })}
+${rec ? ui.kpi({ rotulo: 'Em risco', valor: String(k.risco.length), delta: fmt.brlK(k.mrrRisco), deltaBom: null, comp: `de MRR · ${fmt.pct(k.pctRisco)} do total`, serie: serieOk ? KPI_SERIES.risco : null, formatoSerie: 'mil', alerta: k.risco.length > 0, ajuda: 'Clientes com health score abaixo de 60. O valor é a soma do MRR deles (MRR em risco).', href: ctx.router.href('clientes', { f: 'risco' }) })
     : ui.kpi({ rotulo: 'Em risco', valor: String(k.risco.length), comp: k.n ? `${fmt.pct((k.risco.length / k.n) * 100, 0)} dos clientes` : '', alerta: k.risco.length > 0, ajuda: 'Clientes com health score abaixo de 60. Clique para ver a lista.', href: ctx.router.href('clientes', { f: 'risco' }) })}
 ${ui.kpi({ rotulo: 'Renovam em 30 dias', valor: String(k.renovam.length), comp: k.renovam.length ? (k.renovamSemReuniao.length ? `${fmt.plural(k.renovamSemReuniao.length, 'sem reunião marcada', 'sem reunião marcada')}` : 'todas com reunião marcada') : 'nenhuma renovação próxima', delta: rec && k.renovam.length ? fmt.brlK(k.mrrRenova) : null, deltaBom: null, led: k.renovam.length ? (k.renovamSemReuniao.length ? 'warn' : 'ok') : null, ajuda: `Contratos que renovam nos próximos 30 dias${rec ? ' (o valor é a soma do MRR deles)' : ''}. Âmbar quando algum ainda não tem reunião de renovação marcada. Clique para ver a lista.`, href: ctx.router.href('clientes', { f: 'renovam' }) })}
-${ui.kpi({ rotulo: 'Churn 12 meses', valor: fmt.pct(CARTEIRA_REF.churn12m), delta: `meta < ${CARTEIRA_REF.churnMeta}%`, deltaBom: true, comp: 'dentro da meta', serie: KPI_SERIES.churn, corSerie: 'var(--c2n)', formatoSerie: 'pct', ajuda: 'Clientes que cancelaram nos últimos 12 meses ÷ média de clientes ativos no período.' })}
+${D ? ui.kpi({ rotulo: 'Churn 12 meses', valor: fmt.pct(CARTEIRA_REF.churn12m), delta: `meta < ${CARTEIRA_REF.churnMeta}%`, deltaBom: true, comp: 'dentro da meta', serie: KPI_SERIES.churn, corSerie: 'var(--c2n)', formatoSerie: 'pct', ajuda: 'Clientes que cancelaram nos últimos 12 meses ÷ média de clientes ativos no período.' })
+    : ui.kpi({ rotulo: 'Churn 12 meses', valor: churn.pct == null ? '—' : fmt.pct(churn.pct), comp: churn.pct == null ? 'nenhum cancelamento registrado' : fmt.plural(churn.n, 'cancelamento'), ajuda: 'Clientes encerrados nos últimos 12 meses ÷ (ativos + encerrados no período), a partir do cadastro.' })}
 </div>`;
 
   // matriz risco × valor
@@ -48,7 +52,7 @@ ${ui.kpi({ rotulo: 'Churn 12 meses', valor: fmt.pct(CARTEIRA_REF.churn12m), delt
   });
 
   // carteira
-  const chips = ui.chips(K.FILTROS.map(x => ({ id: x.id, rotulo: x.rotulo, n: todos.filter(x.fn).length, estado: x.estado })), f.id, 'f', { rotulo: 'Filtrar carteira' });
+  const chips = ui.chips(K.filtros().map(x => ({ id: x.id, rotulo: x.rotulo, n: todos.filter(x.fn).length, estado: x.estado })), f.id, 'f', { rotulo: 'Filtrar carteira', primeiroLimpa: false });
   const tabela = ui.tabela({
     cols: [
       { k: 'nome', l: 'Cliente', r: c => `<div class="m-clientes-cl">${logo(c, 28)}<div class="m-clientes-cln"><b class="trunc">${fmt.esc(c.nome)}</b><span class="sub">${fmt.esc(c.segmento)}${c.status === 'onboarding' ? ' · em onboarding' : ''}</span></div></div>` },
@@ -63,7 +67,7 @@ ${ui.kpi({ rotulo: 'Churn 12 meses', valor: fmt.pct(CARTEIRA_REF.churn12m), delt
       { k: 'respId', l: 'Resp.', v: c => K.nomePessoa(c.respId), r: c => ui.avatar(c.respId, 24) },
     ],
     linhas, onRowHref: c => `#/clientes/${c.id}`, ordem: rec ? { k: 'mrr', dir: 'desc' } : { k: 'health', dir: 'asc' }, legenda: 'Carteira de clientes', id: 'm-clientes-tbl',
-    vazio: { titulo: q ? `Nenhum cliente encontrado para “${query.q}”` : 'Nenhum cliente neste filtro', texto: q ? 'Confira a grafia ou busque pelo CNPJ ou segmento.' : 'Escolha outro filtro acima ou cadastre um cliente.', acao: q ? { rotulo: 'Limpar busca', href: ctx.router.href('clientes', { q: null }) } : null },
+    vazio: !todos.length && !q ? { icone: 'building', titulo: 'Nenhum cliente cadastrado ainda', texto: 'Cadastre o primeiro cliente (ou importe uma planilha) para acompanhar health score, entregas, pagamento e renovação.', acao: podeEditar ? { rotulo: 'Cadastrar cliente', href: '#/clientes/novo', icone: 'plus' } : undefined } : { titulo: q ? `Nenhum cliente encontrado para “${query.q}”` : 'Nenhum cliente neste filtro', texto: q ? 'Confira a grafia ou busque pelo CNPJ ou segmento.' : 'Escolha outro filtro acima ou cadastre um cliente.', acao: q ? { rotulo: 'Limpar busca', href: ctx.router.href('clientes', { q: null }) } : null },
   });
   const carteira = ui.card({
     titulo: 'Carteira', sub: rec ? `${fmt.plural(linhas.length, 'cliente')} · ${fmt.brlK(linhas.reduce((a, c) => a + c.mrr, 0))} de MRR` : `${fmt.plural(linhas.length, 'cliente')} · ordenada pelo health (menor primeiro)`, pad: false, cls: 'm-clientes-cart',
@@ -73,7 +77,7 @@ ${ui.kpi({ rotulo: 'Churn 12 meses', valor: fmt.pct(CARTEIRA_REF.churn12m), delt
 
   // retenção por safra
   const cols = ['M0', 'M1', 'M2', 'M3', 'M4', 'M5'];
-  const ret = ui.card({
+  const ret = !D ? safrasReal(ctx) : ui.card({
     titulo: 'Retenção por safra', sub: '% de clientes de cada mês de entrada ainda ativos',
     ajuda: 'Cada linha é uma safra (mês em que os clientes entraram). M0 = mês de entrada; M1 = um mês depois, e assim por diante. Cores mais fortes = retenção maior.',
     corpo: charts.calor({ linhas: SAFRAS.map(s => `${s.safra} · ${s.n}`), colunas: cols, valores: SAFRAS.map(s => cols.map((_, i) => s.m[i] ?? null)), formato: { eixo: v => `${v}%`, tip: v => `${v}% ainda ativos` }, min: 70, max: 100 }) + `<p class="sm mut m-clientes-nota">Média em M3: ${fmt.pct((92 + 90 + 88) / 3, 0)} · safra de junho estabilizou em 85%.</p>`,
@@ -106,7 +110,7 @@ ${ui.lista(ob.parados.map(o => { const c = db.get('clients', o.clientId) || { no
   const mrrSub = rec ? ` · MRR ${fmt.brlK(k.mrr)}` : ` · ${k.risco.length} em risco`;
   const sub = escopo === 'todos' ? `${fmt.plural(k.n, 'cliente ativo', 'clientes ativos')}${mrrSub}` : `Seus clientes: ${fmt.plural(k.n, 'cliente')}${mrrSub}`;
   return `<div class="pg m-clientes">
-${ui.cabecalho({ titulo: 'Clientes', sub, acoes, meta: `${ui.led('ok', 'Health recalculado')}<span class="mut">${ui.rel(new Date(Date.now() - 35 * 60000).toISOString(), { prefixo: '' })}</span>` })}
+${ui.cabecalho({ titulo: 'Clientes', sub, acoes, meta: D ? `${ui.led('ok', 'Health recalculado')}<span class="mut">${ui.rel(new Date(Date.now() - 35 * 60000).toISOString(), { prefixo: '' })}</span>` : metaHealthReal(ctx) })}
 ${kpis}
 <div class="g-2-1 m-clientes-top">${matriz}${onb}</div>
 ${carteira}
@@ -131,7 +135,7 @@ export function mountLista(el, ctx) {
     if (sg) { router.setQuery({ m: sg.dataset.seg === 'todos' ? 'todos' : null }, { render: true }); return; }
     if (e.target.closest('[data-importar]')) { if (ctx.can('clientes', 'editar')) importarClientes(ctx); return; }
     if (e.target.closest('[data-csv]')) {
-      const todos = K.visiveis(); const f = K.FILTROS.find(x => x.id === ctx.query.f) || K.FILTROS[0];
+      const todos = K.visiveis(); const f = K.filtroAtual(ctx.query.f);
       const q = fmt.norm(ctx.query.q || '');
       const l = todos.filter(f.fn).filter(c => !q || fmt.norm(`${c.nome} ${c.razaoSocial} ${c.segmento} ${c.cnpj}`).includes(q)).sort((a, b) => (K.veReceita() ? b.mrr - a.mrr : a.health - b.health));
       const blob = new Blob([K.csv(l)], { type: 'text/csv;charset=utf-8' });
@@ -152,4 +156,31 @@ export function mountLista(el, ctx) {
   };
   el.addEventListener('click', onClick);
   return () => { el.removeEventListener('click', onClick); clearTimeout(t); };
+}
+
+/* ---------- produção (db.dadosDemo false): churn e safras a partir do cadastro real ---------- */
+const ENCERRADO = ['encerrado', 'inativo', 'churn', 'perdido', 'cancelado'];
+const encerrado = c => c.ativo === false || ENCERRADO.includes(c.status);
+function churnReal(db) {
+  const desde = new Date(Date.now() - 365 * 864e5).toISOString().slice(0, 10);
+  const todos = db.list('clients'); const fim = c => String(c.encerradoEm || c.dataEncerramento || c.updatedAt || '').slice(0, 10);
+  const n = todos.filter(c => encerrado(c) && fim(c) >= desde).length; const base = todos.filter(c => !encerrado(c)).length + n;
+  return { n, pct: n && base ? (n / base) * 100 : null };
+}
+function safrasReal(ctx) {
+  const { ui, charts, fmt, db } = ctx;
+  const titulo = 'Retenção por safra';
+  const meses = Array.from({ length: 6 }, (_, i) => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 5 + i); return fmt.iso(d).slice(0, 7); });
+  const todos = db.list('clients', c => c.desde && meses.includes(String(c.desde).slice(0, 7)));
+  if (!todos.length) return ui.card({ titulo, sub: 'clientes de cada mês de entrada ainda ativos', corpo: ui.vazio({ compacto: true, icone: 'layers', titulo: 'Sem safras para comparar ainda', texto: 'Cada mês de entrada de clientes vira uma safra. Cadastre os clientes com a data de início do contrato para acompanhar quantos continuam ativos.' }) });
+  const linhas = meses.map(m => { const l = todos.filter(c => String(c.desde).slice(0, 7) === m); return { m, n: l.length, ativos: l.filter(c => !encerrado(c)).length }; }).filter(x => x.n);
+  return ui.card({ titulo, sub: '% de cada safra ainda ativa hoje', ajuda: 'Cada linha é uma safra (mês em que os clientes entraram), com a parcela que continua ativa hoje.',
+    corpo: charts.calor({ linhas: linhas.map(x => `${fmt.mesAno(x.m + '-01')} · ${x.n}`), colunas: ['Hoje'], valores: linhas.map(x => [Math.round((x.ativos / x.n) * 100)]), formato: { eixo: v => `${v}%`, tip: v => `${v}% ainda ativos` }, min: 0, max: 100 }) });
+}
+/** produção: status do health a partir da rotina real "Health score" (se existir) — nunca um horário inventado */
+function metaHealthReal(ctx) {
+  const { ui, db } = ctx;
+  const r = db.list('routines').find(x => /health/i.test(`${x.id} ${x.nome}`));
+  if (!r) return `<span class="mut sm">${db.count('clients') ? 'Health score atualizado no cadastro' : 'Nenhum cliente cadastrado'}</span>`;
+  return `${ui.led(r.estado || 'off', 'Health recalculado')}${r.ultimaEm ? `<span class="mut">${ui.rel(r.ultimaEm, { prefixo: '' })}</span>` : ''}`;
 }

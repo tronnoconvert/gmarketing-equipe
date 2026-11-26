@@ -6,6 +6,8 @@ import { MESES, MESES_PROJ, RECEITA, CUSTOS, PROJECAO } from '../financeiro/data
 import { estadoFatura } from '../financeiro/calc.js';
 import { padrao } from '../../core/padroes/index.js';
 import { limOcupacao, rotuloOcupacao } from '../operacao/lib.js';
+import { itensReais, renderReal } from './real.js'; // produção (db.dadosDemo false): tudo das coleções reais
+import { cardBackups } from './backups.js'; // card "Backups" (só Dono/Admin)
 
 const RES_ID = 'cockpit-resolvidos';
 const SEM_EDICAO = 'Seu perfil só visualiza o Cockpit. Peça acesso de edição para marcar itens como resolvidos.';
@@ -16,6 +18,7 @@ function salvarResolvidos(db, itens, log) { db.upsert('finance', { id: RES_ID, i
 /** itens de "Precisa de você hoje" com dados vivos quando existirem */
 function itensHoje(ctx) {
   const { db, fmt } = ctx; const res = resolvidos(db);
+  if (!db.dadosDemo) return itensReais(ctx).map(it => (res[it.k] ? { ...it, resolvido: res[it.k] } : it));
   return ITENS.map(it => {
     const o = { ...it };
     if (it.fatura) {
@@ -45,7 +48,7 @@ function render(ctx) {
   const head = `<header class="ck-hd">
 <div class="ck-hd-t"><h1>${fmt.esc(saud)}, ${fmt.esc(fmt.primeiro(ctx.user.nome))}.</h1>
 <p>${pend.length ? `${ui.led(nErr ? 'err' : 'warn', false)}<span>Você tem <b>${fmt.esc(resumo)}</b></span>` : `${ui.led('ok', false)}<span>${fmt.esc(resumo)}</span>`}</p></div>
-<div class="ck-hd-m sm mut"><span>${fmt.esc(fmt.diaSemana(hoje))}, ${fmt.data(hoje)}</span><span aria-hidden="true">·</span><span>${fmt.esc(ctx.periodoInfo.rotulo)} ${fmt.esc(ctx.periodoInfo.comparacao)}</span><span aria-hidden="true">·</span><span>atualizado ${ui.rel(new Date(Date.now() - 4 * 60000).toISOString())}</span></div></header>`;
+<div class="ck-hd-m sm mut"><span>${fmt.esc(fmt.diaSemana(hoje))}, ${fmt.data(hoje)}</span><span aria-hidden="true">·</span><span>${fmt.esc(ctx.periodoInfo.rotulo)} ${fmt.esc(ctx.periodoInfo.comparacao)}</span><span aria-hidden="true">·</span><span>atualizado ${ui.rel(new Date(Date.now() - (db.dadosDemo ? 4 * 60000 : 0)).toISOString())}</span></div></header>`;
 
   const kpis = `<div class="ck-kpis">${ORDEM_KPI.map(k => { const K = KPIS[k], P = K[periodo] || K.mes; return ui.kpi({ rotulo: K.rotulo, valor: P.valor || K.valor, delta: P.delta, deltaBom: K.deltaBom, comp: P.comp, serie: P.serie, ajuda: K.ajuda, alerta: K.alerta, href: K.href, formatoSerie: K.formatoSerie, id: `ck-kpi-${k}` }); }).join('')}</div>`;
 
@@ -56,11 +59,13 @@ function render(ctx) {
 <span class="ck-it-a">${ui.btn({ rotulo: it.acao, href: it.href, sm: true, tipo: it.estado === 'err' ? 'pri' : '', attrs: { 'data-acao': it.k } })}${ui.btnIc('check', pode ? 'Marcar como resolvido' : SEM_EDICAO, { 'data-resolver': it.k, disabled: !pode })}</span></li>`;
   const feitosHtml = feitos.length ? `<details class="ck-feitos"${ctx.query.resolvidos ? ' open' : ''}><summary>${ui.ic('check-circle')}<span>${fmt.plural(feitos.length, 'item resolvido', 'itens resolvidos')}</span></summary><ul class="ck-fl">${feitos.map(it => `<li>${ui.led('ok', false)}<span class="trunc"><s>${fmt.esc(it.titulo)}</s> <span class="mut sm">· ${fmt.esc(it.auto || `resolvido por ${it.resolvido.por || '—'} ${fmt.rel(it.resolvido.em)}`)}</span></span>${it.auto ? '' : ui.btn({ rotulo: 'Desfazer', sm: true, tipo: 'link', disabled: !pode, attrs: { 'data-reabrir': it.k } })}</li>`).join('')}</ul></details>` : '';
   const precisa = ui.card({
-    titulo: 'Precisa de você hoje', id: 'ck-hoje', cls: 'ck-hoje', sub: pend.length ? fmt.plural(pend.length, 'item', 'itens') : 'tudo resolvido',
+    titulo: 'Precisa de você hoje', id: 'ck-hoje', cls: `ck-hoje${pend.length ? '' : ' ck-ok'}`, sub: pend.length ? fmt.plural(pend.length, 'item', 'itens') : 'tudo resolvido',
     ajuda: 'Itens que dependem de uma decisão sua, do mais crítico para o menos. Use a ação para resolver na hora ou marque como resolvido (✓) — dá para desfazer.',
     acoes: ui.btn({ rotulo: 'Alertas', href: '#/alertas', sm: true, tipo: 'ghost', iconeDir: 'arrow-right' }),
     corpo: `${pend.length ? `<ul class="lst ck-lst">${pend.map(linha).join('')}</ul>` : ui.vazio({ icone: 'check-circle', titulo: 'Tudo em ordem por hoje', texto: 'Quando algo precisar de você — cliente em risco, rotina falhando, fatura vencida — aparece aqui.', compacto: true })}${feitosHtml}`,
   });
+  // produção: o resto da página sai das coleções reais (cockpit/real.js); o snapshot abaixo é só do modo demonstração
+  if (!db.dadosDemo) return renderReal(ctx, head, precisa);
 
   /* Saúde da agência */
   const saude = ui.card({
@@ -116,7 +121,7 @@ function render(ctx) {
   return `<div class="pg m-cockpit">${head}${kpis}
 <div class="ck-r1">${precisa}${saude}</div>
 <div class="g-2-1">${rc}${torre}</div>
-<div class="g-2-1">${mapa}<div class="stack ck-st">${capacidade}${renov}</div></div></div>`;
+<div class="g-2-1">${mapa}<div class="stack ck-st">${capacidade}${renov}${cardBackups(ctx)}</div></div></div>`;
 }
 
 function receitaCustos(ctx) {
@@ -142,7 +147,7 @@ function mount(el, ctx) {
   const onClick = e => {
     const r = e.target.closest('[data-resolver]');
     if (r && !r.disabled) {
-      const k = r.dataset.resolver; const it = ITENS.find(x => x.k === k);
+      const k = r.dataset.resolver; const it = itensHoje(ctx).find(x => x.k === k) || { titulo: k };
       const itens = resolvidos(db); const antes = { ...itens };
       itens[k] = { em: new Date().toISOString(), por: ctx.user.nome };
       salvarResolvidos(db, itens, `marcou como resolvido no Cockpit: ${it.titulo}`);
@@ -151,7 +156,7 @@ function mount(el, ctx) {
     }
     const d = e.target.closest('[data-reabrir]');
     if (d && !d.disabled) {
-      const k = d.dataset.reabrir; const it = ITENS.find(x => x.k === k);
+      const k = d.dataset.reabrir; const it = itensHoje(ctx).find(x => x.k === k) || { titulo: k };
       const itens = resolvidos(db); const antes = { ...itens }; delete itens[k];
       salvarResolvidos(db, itens, `reabriu no Cockpit: ${it.titulo}`);
       ui.toast(`"${it.titulo}" voltou para a lista.`, { tipo: 'info', desfazer: () => salvarResolvidos(db, antes, `marcou como resolvido no Cockpit: ${it.titulo}`) });
@@ -163,6 +168,6 @@ function mount(el, ctx) {
 
 export default {
   id: 'cockpit', titulo: 'Cockpit', icone: 'gauge', grupo: 'visao', rota: 'cockpit', routes: ['cockpit'],
-  watch: ['finance', 'invoices', 'clients', 'routines', 'teamStats', 'team'],
+  watch: ['finance', 'invoices', 'clients', 'routines', 'teamStats', 'team', 'alerts', 'cash', 'deliveries', 'backupStatus'],
   render, mount,
 };

@@ -121,10 +121,8 @@ const torre = [
 
 /* ============================== Orçamento ============================== */
 const orcamento = [
-  { id: 'orcamento.maxMudancasHora', grupo: 'Limites de alteração de verba', nome: 'Mudanças de orçamento por conjunto por hora',
-    significa: 'Quantas vezes o orçamento do mesmo conjunto (ou da campanha, em CBO) pode ser alterado em 1 hora. O Meta aceita no máximo 4; dá para deixar mais rígido.',
-    calculo: 'Conta as alterações do mesmo item nos últimos 60 minutos. Ao atingir o limite, a Torre bloqueia e mostra a hora da próxima liberação (1ª alteração da janela + 1 h).',
-    valor: 4, unidade: 'n', min: 1, max: 4, passo: 1, editavel: true, ondeUsa: ['Torre › Orçamento diário', 'Torre › Fazer agora (IA)'], link: TORRE },
+  // (25/11/2026) decisão do dono: SEM limite de alterações de orçamento por hora (o antigo orcamento.maxMudancasHora foi removido);
+  // toda alteração continua exigindo SIM e fica auditada (quem, qual cliente, se o cliente é de outro gestor).
   { id: 'orcamento.aumentoMaxPct', grupo: 'Limites de alteração de verba', nome: 'Aumento máximo por mudança (aviso)',
     significa: 'Aumentos grandes de uma vez podem reiniciar a fase de aprendizado do Meta e deixar o custo instável por 3 a 7 dias.',
     calculo: 'Aumento = (novo − atual) ÷ atual × 100. Acima deste valor a tela avisa antes da confirmação SIM (não bloqueia). O motor de recomendações nunca sugere mais que o "Limite por mudança" da regra Escalar verba.',

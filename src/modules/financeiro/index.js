@@ -10,6 +10,7 @@ import {
 } from './calc.js';
 import { abaComissoes, csvComissoes } from './comissoes.js';
 import * as LEM from './lembretes.js';
+import * as REAL from './real.js'; // produção: cálculos das coleções reais (sem snapshot de demonstração)
 import { padrao } from '../../core/padroes/index.js';
 /* limites da central "Padrões e regras" */
 const LC = () => padrao('financeiro.concentracao.limite', 40);
@@ -35,12 +36,16 @@ function render(ctx) {
   if (aba !== 'visao') ctx.migalha(ABAS.find(a => a.id === aba).rotulo);
   const acoes = ui.btn({ rotulo: 'Lançamento', icone: 'plus', tipo: 'pri', disabled: !pode, title: pode ? 'Registrar receita ou despesa (atalho: L)' : SEM_EDICAO, attrs: { 'data-f': 'lancar' } });
   const ultimo = ctx.db.list('cash').concat(ctx.db.list('invoices')).map(x => x.updatedAt || x.createdAt).filter(Boolean).sort().pop();
+  const demo = ctx.db.dadosDemo;
   const head = ui.cabecalho({
-    titulo: 'Financeiro', sub: `Competência novembro/2026 · comparando ${ctx.periodoInfo.comparacao.replace(/^vs /, 'com ')}`, acoes,
-    meta: `${ui.led('ok', 'Conciliação bancária em dia')}<span class="mut sm">Atualizado ${ui.rel(ultimo || new Date().toISOString())}</span>`,
+    titulo: 'Financeiro', sub: `Competência ${demo ? 'novembro/2026' : REAL.competenciaAtual()} · comparando ${ctx.periodoInfo.comparacao.replace(/^vs /, 'com ')}`, acoes,
+    meta: demo ? `${ui.led('ok', 'Conciliação bancária em dia')}<span class="mut sm">Atualizado ${ui.rel(ultimo || new Date().toISOString())}</span>`
+      : `<span class="mut sm">${ultimo ? `Último lançamento ${ui.rel(ultimo)}` : 'Nenhum lançamento ainda'}</span>`,
   });
-  const corpo = { visao, caixa, dre: dreAba, receber, rentabilidade, unidade, comissoes: abaComissoes, automacao: LEM.abaAutomacao }[aba](ctx, pode);
-  return `<div class="pg m-financeiro">${head}${ui.tabs(ABAS, aba, 'financeiro')}${corpo}</div>`;
+  // produção: abas calculadas das coleções reais (Receber e pagar, Comissões e Automação já leem só dados reais)
+  const corpo = (demo ? { visao, caixa, dre: dreAba, receber, rentabilidade, unidade, comissoes: abaComissoes, automacao: LEM.abaAutomacao }
+    : { visao: REAL.visao, caixa: (c, p) => REAL.caixa(c, p, tabelaLancamentos(c, p)), dre: REAL.dreAba, receber, rentabilidade: REAL.rentabilidade, unidade: REAL.unidade, comissoes: abaComissoes, automacao: LEM.abaAutomacao })[aba](ctx, pode);
+  return `<div class="pg m-financeiro${demo ? '' : ' mf-real'}">${head}${ui.tabs(ABAS, aba, 'financeiro')}${corpo}</div>`;
 }
 
 /* ---------- Visão geral ---------- */
@@ -106,6 +111,14 @@ ${ui.kpi({ rotulo: 'Menor saldo projetado', valor: fmt.brlK(minimo), comp: `sema
   const aviso = minimo < limite
     ? ui.aviso({ tipo: 'err', titulo: `O saldo fica abaixo da linha de alerta na semana de ${semanaMin.rotulo}.`, texto: 'Antecipe recebíveis, renegocie pagamentos grandes ou adie despesas não essenciais.' })
     : ui.aviso({ tipo: 'ok', titulo: 'Sem risco de caixa nos próximos 90 dias.', texto: `O menor saldo projetado (${fmt.brlK(minimo)}) fica acima da linha de alerta de ${fmt.brlK(limite)}, mesmo com o 13º salário em dezembro.` });
+  return `${kpis}${aviso}
+<div class="g2">${ui.card({ titulo: 'Entradas × saídas por semana', sub: 'R$ mil · próximas 13 semanas', ajuda: 'Semanas começam na segunda-feira. Inclui lançamentos previstos que você registrar.', corpo: barras })}
+${ui.card({ titulo: 'Saldo projetado (90 dias)', sub: 'R$ mil', ajuda: `Saldo atual + entradas − saídas, semana a semana. A linha tracejada é o limite de alerta de runway (${fmt.dec(RW(), RW() % 1 ? 1 : 0)} meses).`, corpo: saldoCh })}</div>
+${tabelaLancamentos(ctx, pode)}`;
+}
+/** tabela de lançamentos de caixa (demonstração e produção) */
+function tabelaLancamentos(ctx, pode) {
+  const { ui, fmt, db } = ctx;
   const hoje = fmt.iso(new Date());
   const lanc = db.list('cash').sort((a, b) => (b.data || '').localeCompare(a.data || '') || (b.createdAt || '').localeCompare(a.createdAt || ''));
   const tabela = ui.tabela({
@@ -117,12 +130,9 @@ ${ui.kpi({ rotulo: 'Menor saldo projetado', valor: fmt.brlK(minimo), comp: `sema
       { k: 'acoes', l: '', sort: false, r: l => (l.base || l.invoiceId || l.payableId ? '' : ui.btnIc('trash', 'Excluir lançamento', { 'data-f': 'exc-lanc', 'data-id': l.id, disabled: !pode })), w: '48px' },
     ],
     linhas: lanc, legenda: 'Lançamentos de caixa', altura: 460,
-    vazio: { titulo: 'Nenhum lançamento', texto: 'Use "+ Lançamento" para registrar uma receita ou despesa.' },
+    vazio: { icone: 'wallet', titulo: 'Nenhum lançamento', texto: 'Use "+ Lançamento" para registrar uma receita ou despesa. Faturas pagas e contas quitadas entram aqui sozinhas.' },
   });
-  return `${kpis}${aviso}
-<div class="g2">${ui.card({ titulo: 'Entradas × saídas por semana', sub: 'R$ mil · próximas 13 semanas', ajuda: 'Semanas começam na segunda-feira. Inclui lançamentos previstos que você registrar.', corpo: barras })}
-${ui.card({ titulo: 'Saldo projetado (90 dias)', sub: 'R$ mil', ajuda: `Saldo atual + entradas − saídas, semana a semana. A linha tracejada é o limite de alerta de runway (${fmt.dec(RW(), RW() % 1 ? 1 : 0)} meses).`, corpo: saldoCh })}</div>
-${ui.card({ titulo: 'Lançamentos', sub: `${lanc.length} registros`, pad: false, acoes: ui.btn({ rotulo: 'Lançamento', icone: 'plus', sm: true, disabled: !pode, title: pode ? '' : SEM_EDICAO, attrs: { 'data-f': 'lancar' } }), corpo: tabela })}`;
+  return ui.card({ titulo: 'Lançamentos', sub: `${lanc.length} registros`, pad: false, acoes: ui.btn({ rotulo: 'Lançamento', icone: 'plus', sm: true, disabled: !pode, title: pode ? '' : SEM_EDICAO, attrs: { 'data-f': 'lancar' } }), corpo: tabela });
 }
 
 /* ---------- DRE ---------- */
@@ -316,9 +326,10 @@ ${f.cobrancas && f.cobrancas.length ? `<p class="sm mut">Já cobrada ${fmt.plura
   const canal = enviado.canal === 'email' ? 'e-mail' : 'WhatsApp';
   const antes = f.cobrancas || [];
   db.update('invoices', f.id, { cobrancas: [...antes, { quando: new Date().toISOString(), canal: enviado.canal, para: enviado.para, mensagem: enviado.mensagem, por: ctx.user.nome }] }, { log: `cobrou a fatura nº ${f.numero} de ${nomeFatura(f)} (${fmt.brl(f.valor)}) por ${canal}` });
-  const resp = f.clientId && (db.get('clients', f.clientId) || {}).respId || (CLIENTES.find(c => c.id === f.clientId) || {}).resp;
+  const resp = f.clientId && (db.get('clients', f.clientId) || {}).respId || (db.dadosDemo ? (CLIENTES.find(c => c.id === f.clientId) || {}).resp : null);
   const respUser = resp && (db.get('team', resp) || {}).userId;
-  const para = [respUser, 'u-paulo'].filter(u => u && u !== ctx.real.id);
+  const fin = db.dadosDemo ? ['u-paulo'] : db.list('users', u => u.papel === 'financeiro' && u.ativo !== false).map(u => u.id);
+  const para = [...new Set([respUser, ...fin])].filter(u => u && u !== ctx.real.id);
   if (para.length) notify.enviar({ para, de: ctx.real.id, tipo: 'mensagem', titulo: `Cobrança enviada: ${nomeFatura(f)}`, texto: `${fmt.brl(f.valor)} · ${estadoFatura(f).rotulo}. Enviada por ${canal} por ${ctx.user.nome}.`, link: `#/financeiro/receber?fatura=${f.id}`, refCol: 'invoices', refId: f.id });
   ui.toast(`Cobrança enviada por ${canal} para ${nomeFatura(f)}.`, { desfazer: () => db.update('invoices', f.id, { cobrancas: antes }, { log: `desfez a cobrança da fatura nº ${f.numero}` }) });
 }
@@ -378,7 +389,7 @@ async function pagarConta(ctx, id) {
 async function lancar(ctx) {
   const { ui, fmt, db } = ctx;
   if (!ctx.can('financeiro', 'editar')) { ui.toast(SEM_EDICAO, { tipo: 'warn' }); return; }
-  const clientes = (db.list('clients').length ? db.list('clients').map(c => ({ v: c.id, l: c.nome || c.fantasia || c.id })) : CLIENTES.map(c => ({ v: c.id, l: c.nome }))).sort((a, b) => a.l.localeCompare(b.l, 'pt-BR'));
+  const clientes = (db.list('clients').length || !db.dadosDemo ? db.list('clients').map(c => ({ v: c.id, l: c.nome || c.fantasia || c.id })) : CLIENTES.map(c => ({ v: c.id, l: c.nome }))).sort((a, b) => a.l.localeCompare(b.l, 'pt-BR'));
   const opts = t => CAT[t].map(c => `<option value="${fmt.esc(c)}">${fmt.esc(c)}</option>`).join('');
   let dados = null;
   const ok = await ui.modal({ titulo: 'Novo lançamento', sub: 'Receita ou despesa que entra no fluxo de caixa', confirmar: 'Salvar lançamento', largura: 'md',
