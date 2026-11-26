@@ -10,7 +10,7 @@
 5. Token Meta (usuário do sistema) para Pausar/Orçamento — passos em DEPLOY §8 / relatório item 17.
 
 ## Minha parte
-- Agente em andamento ao parar: gestores veem TODOS os clientes (padrão "Meus", botão Meus/Todos), SEM limite de alterações de verba (dono removeu),
+- PUBLICADO 26/11 no ramo producao (2b86572): Painel de Voo real, sem dados fictícios, backups + cartão, auditoria, gestores veem todos, sem limite de verba + auditoria deOutroGestor. Bateria 3995/3995.
   auditoria mostra quando um gestor altera cliente de outro (flag deOutroGestor + notificação ao responsável e dono/admin). Se não terminou, retomar.
 - Depois: rodar bateria completa, publicar no ramo `producao` (Netlify publica sozinho) incluindo netlify.toml do main (CSP/HSTS) — testar CSP no site.
 - Agendar auditoria semanal (comando em docs/BACKUP-E-RESTAURACAO.md §Auditoria) e conferir 1º backup diário (03:10) e cron aos-voo-dados.
