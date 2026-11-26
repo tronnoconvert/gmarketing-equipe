@@ -253,7 +253,7 @@ export default async function (t) {
   await page.$$eval('details.lv-s', l => l.forEach(d => { d.open = true; })); await page.waitForTimeout(100);
   const orcA = await page.$eval('[data-voo-orc]', b => b.dataset.vooOrc);
   await page.click(`[data-voo-orc="${orcA}"]`); await page.waitForSelector('.ov-modal [name="valor"]');
-  await page.fill('.ov-modal [name="valor"]', '123'); await page.click('.ov-modal [data-ok]'); await page.waitForTimeout(500); console.log('DBG', (await page.textContent('body')).slice(-600)); await page.waitForSelector('.ov-modal [name="sim"]');
+  await page.fill('.ov-modal [name="valor"]', '4321'); await page.click('.ov-modal [data-ok]'); await page.waitForTimeout(500); await page.waitForSelector('.ov-modal [name="sim"]');
   await digitarSIM('SIM'); await page.click('.ov-modal [data-ok]'); await page.waitForSelector('.ov-modal', { state: 'detached', timeout: 5000 }); await page.waitForTimeout(500);
   const caA = await voo(id => window.AOS.db.list('clientActions', a => a.clientId === id && a.autorId === 'u-ana').pop(), cliAlheio.id);
   ok(caA && caA.deOutroGestor === true && caA.respId === cliAlheio.respId && caA.autorNome, 'ação da Ana marcada deOutroGestor com autor e responsável');
@@ -269,6 +269,7 @@ export default async function (t) {
   const audRows = await page.$$eval('.m-aud-f ~ * tbody tr, table tbody tr', l => l.map(r => r.textContent));
   ok(audRows.length >= 1 && audRows.every(x => /cliente de/.test(x)) && audRows.some(x => /Ana/.test(x)), `Auditoria: filtro "Alterações em clientes de outro gestor" (${audRows.length})`);
   await t.sair(); await t.login('ana@agencia.demo');
+  await t.ir('#/torre/voo'); await page.waitForSelector('.m-voo-contas tbody tr', { timeout: 6000 });
 
   ok(!(await page.$('.m-voo-vincs')), 'sem "Contas sem cliente vinculado" para gestor');
   ok(await voo(() => window.AOS_VOO.estado.geral.linhas.every(l => l[10] == null) && window.AOS_VOO.estado.geral.veReceita === false), 'pacote sem valores de receita (faturamento)');

@@ -42,7 +42,7 @@ ${query.pessoa || query.mod || query.per || query.outro ? ui.btn({ rotulo: 'Limp
     cols: [
       { k: 'quando', l: 'Quando', r: a => `<span class="num" title="${esc(fmt.dataHora(a.quando))}">${fmt.data(a.quando)} ${fmt.hora(a.quando)}</span><span class="sub">${esc(fmt.rel(a.quando))}</span>` },
       { k: 'quemNome', l: 'Pessoa', r: a => (a.quem ? `<span class="m-adm-pess">${ui.avatar(a.quem, 22)}<span>${esc(a.quemNome || (db.get('users', a.quem) || {}).nome || a.quem)}</span></span>` : `<span class="mut">${ui.ic('settings')} Sistema</span>`) },
-      { k: 'oque', l: 'Ação', r: a => `${esc(a.oque)}${a.deOutroGestor ? ` ${ui.selo('warn', `cliente de ${a.respNome || 'outro gestor'}`)}` : ''}` },
+      { k: 'oque', l: 'Ação', r: a => `${esc(a.oque)}${a.deOutroGestor ? `<span class="sub t-warn" data-de-outro>${ui.ic('users')} Cliente de outro gestor (${esc(a.respNome || '—')})</span>` : ''}` },
       { k: 'col', l: 'Módulo', v: a => MOD_ROTULO[modDaCol(a.col)] || a.col, r: a => esc(MOD_ROTULO[modDaCol(a.col)] || a.col || '—') },
       { k: 'refId', l: 'Registro', mobile: false, v: a => nomeRef(db, a), r: a => { const h = linkRef(a.col, a.refId); const n = nomeRef(db, a); return a.refId ? (h ? `<a href="${esc(h)}" class="sm">${esc(n)}</a>` : `<span class="sm mut">${esc(n)}</span>`) : '<span class="mut">—</span>'; } },
     ],

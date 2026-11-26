@@ -2,7 +2,7 @@
 // Cria 2 logins temporários (dono de teste e gestor de teste, domínio .invalid) e 1 cliente de teste ligado a UMA conta
 // real do cache (+1 cliente de OUTRO responsável ligado a outra conta), chama as Edge Functions voo-dados e voo-acao e confere:
 // gestor vê todas as contas VINCULADAS (cobre colega; decisão de 25/11/2026) mas não as sem cliente, receita removida para o gestor,
-// busca ao vivo + intervalo mínimo de 20 s, conta fora do escopo recusada, SIM obrigatório, só pausar/orçamento, "ver como"
+// sem limite de mudanças por hora, busca ao vivo + intervalo mínimo de 20 s, conta fora do escopo recusada, SIM obrigatório, só pausar/orçamento, "ver como"
 // recusado e "não configurado" sem META_ACCESS_TOKEN. No fim APAGA só o que criou. Imprime apenas contagens (nunca nomes).
 // Uso: SQL_CMD=/caminho/q.sh NODE_USE_ENV_PROXY=1 NODE_EXTRA_CA_CERTS=... node tests/live/voo.mjs
 //   SQL_CMD: comando que recebe `-c "<sql>"` e devolve JSON (Management API do Supabase). Nunca use a service_role key aqui.
@@ -149,11 +149,10 @@ try {
   const st = await fn('voo-acao', tDono, { acao: 'status' });
   ok(st.status === 200 && st.j.configurado === false, 'status: ações aguardando o token');
 
-  console.log('▶ limite de 10 mudanças de orçamento por conjunto por hora (banco)');
-  const res = []; for (let k = 0; k < 11; k++) res.push(Number(sql(`select public.voo_reservar_mudanca('gmarketing','voo-teste-obj','x',null,1,2,10) r`)[0].r));
-  ok(res.slice(0, 10).every(x => x > 0) && res[10] === -1, `10 reservas aceitas, a 11ª recusada (${res.filter(x => x > 0).length})`);
-  const acima = Number(sql(`select public.voo_reservar_mudanca('gmarketing','voo-teste-obj','x',null,1,2,50) r`)[0].r);
-  ok(acima === -1, 'limite pedido acima de 10 continua travado em 10');
+  console.log('▶ sem limite de mudanças de orçamento por hora (decisão de 25/11/2026), tudo registrado (banco)');
+  const res = []; for (let k = 0; k < 12; k++) res.push(Number(sql(`select public.voo_reservar_mudanca('gmarketing','voo-teste-obj','x',null,1,2,null) r`)[0].r));
+  ok(res.every(x => x > 0), `12 mudanças na mesma hora, nenhuma recusada (${res.filter(x => x > 0).length})`);
+  ok(Number(sql(`select count(*) n from public.voo_mudancas where objeto_id = 'voo-teste-obj'`)[0].n) === 12, 'todas registradas em voo_mudancas (histórico)');
   sql(`delete from public.voo_mudancas where objeto_id = 'voo-teste-obj'`);
   if (process.env.OUT && process.env.SUPABASE_ESM_FILE) await telaProducao(gestor, contaTeste);
   const priv = await fetch(`${URL_SB}/rest/v1/voo_cache?select=chave&limit=1`, { headers: { apikey: ANON, Authorization: `Bearer ${tDono}` } });
