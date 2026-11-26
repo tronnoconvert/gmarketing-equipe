@@ -1,7 +1,7 @@
 // engine.js — agregação dos dados diários (Windsor) e motor de "Decisões recomendadas" (regras transparentes).
 import { db } from '../../core/store.js';
 import * as fmt from '../../core/fmt.js';
-import { CAMPO_RESULTADO, F_CONVERSA } from './data.js';
+import { CAMPO_RESULTADO, F_CONVERSA, CONTA_DE, CONTAS_DEMO } from './data.js';
 import MotorRecs from '../../shared/motor-recs.mjs';
 import { padrao } from '../../core/padroes/index.js';
 
@@ -12,15 +12,128 @@ export const TIPOS = {
   engaj: { rot: 'Engajamentos', curto: 'engaj.', um: 'engajamento', cpr: 'Custo/engaj.', custo: 'custo por engajamento' },
 };
 
+/* ---------------- contas: CA01 e CA02 · HOF (seletor "CA01 / CA02 / As duas (somadas)", ?conta= na URL) ---------------- */
+// Produção: as duas contas reais do dono (dados AO VIVO pela Edge Function windsor-proxy, só Dono/Admin).
+// Demonstração: duas contas FICTÍCIAS (data.js). A produção nunca mostra dados de demonstração.
+const CONTAS_REAIS = [
+  { k: 'ca01', id: 'act_1906477940242386', nome: 'CA01 (conta principal)', curto: 'CA01' },
+  { k: 'ca02', id: 'act_848802707655510', nome: 'CA02 · HOF', curto: 'CA02 · HOF' },
+];
+export const CONTAS = db.dadosDemo ? CONTAS_DEMO : CONTAS_REAIS;
+export const SOMA = 'soma';
+let sel = SOMA;
+/** escolhe a conta pela query (?conta=ca01|ca02; ausente = as duas somadas) */
+export function selecionar(q) { sel = CONTAS.some(c => c.k === q) ? q : SOMA; return sel; }
+export const selecao = () => sel;
+export const contaSel = () => CONTAS.find(c => c.k === sel) || null;
+const normAct = v => String(v == null ? '' : v).replace(/^act_/i, '').replace(/\D/g, '');
+const kDeAct = v => { const n = normAct(v); const c = CONTAS.find(x => normAct(x.id) === n); return c ? c.k : null; };
+/** conta (ca01|ca02) de uma linha ou entidade; dados antigos do demo sem o campo caem pelo mapa da campanha */
+export const contaDe = r => r.conta || kDeAct(r.account_id) || CONTA_DE[r.campaign_id || r.campanhaId] || 'ca01';
+const daSel = r => sel === SOMA || contaDe(r) === sel;
+
 /* ---------------- cache por versão dos dados ---------------- */
 let versao = 0; const cache = new Map();
 db.on(col => { if (['campaignDaily', 'campaigns', 'campaignAccount', 'creatives', 'settings', 'recsLog', '*'].includes(col)) { versao++; cache.clear(); } });
-const memo = (k, fn) => { const kk = `${versao}:${k}`; if (!cache.has(kk)) cache.set(kk, fn()); return cache.get(kk); };
+const memo = (k, fn) => { const kk = `${versao}:${sel}:${k}`; if (!cache.has(kk)) cache.set(kk, fn()); return cache.get(kk); };
 
-export const conta = () => db.get('campaignAccount', 'demo') || db.list('campaignAccount')[0] || null;
-export const linhas = () => memo('linhas', () => db.list('campaignDaily').sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0)));
-export const entidades = () => memo('ent', () => { const m = new Map(); db.list('campaigns').forEach(c => m.set(c.id, c)); return m; });
+/* ---------------- produção: dados ao vivo (memória, nunca gravados no banco) ---------------- */
+export const vivo = { rows: null, ents: null, contas: {}, carregando: false, erro: null, em: null, ouvintes: new Set() };
+let avisoAg = false;
+const avisarVivo = () => { versao++; cache.clear(); if (avisoAg) return; avisoAg = true; setTimeout(() => { avisoAg = false; [...vivo.ouvintes].forEach(f => { try { f(); } catch (e) { console.error(e); } }); }, 0); };
+export const ouvirVivo = fn => { vivo.ouvintes.add(fn); return () => vivo.ouvintes.delete(fn); };
+export const DIAS_VIVO = 180;
+const CAMPOS_VIVO = ['date', 'account_id', 'campaign_id', 'campaign', 'campaign_effective_status', 'campaign_objective', 'adset_id', 'adset_name', 'adset_effective_status', 'adset_daily_budget',
+  'ad_id', 'ad_name', 'effective_status', 'spend', 'impressions', 'clicks', 'reach', 'frequency', 'actions_lead', F_CONVERSA, 'actions_purchase', 'action_values_purchase', 'actions_post_engagement', 'actions_video_view'];
+const num = v => (v == null || v === '' ? 0 : Number(v) || 0);
+const stDe = v => (/^(ACTIVE|IN_PROCESS|WITH_ISSUES)$/i.test(String(v || '')) ? 'ativo' : 'pausado');
+/** tipo de resultado da campanha: objetivo do Meta; sem objetivo, o que a campanha gerou */
+function tipoDe(obj, soma) {
+  const o = String(obj || '').toUpperCase();
+  if (/LEAD/.test(o)) return 'lead';
+  if (/MESSAG|CONVERSA/.test(o)) return 'conversa';
+  if (/SALES|CONVERSIONS|PURCHASE|PRODUCT/.test(o)) return 'compra';
+  if (/ENGAGEMENT|AWARENESS|TRAFFIC|VIDEO|REACH|POST/.test(o) && !soma.lead && !soma.conversa && !soma.compra) return 'engaj';
+  if (soma.compra) return 'compra'; if (soma.conversa) return 'conversa'; if (soma.lead) return 'lead';
+  return 'engaj';
+}
+/** linhas do Windsor (anúncio × dia) → linhas no formato de campaignDaily + entidades campanha/conjunto/anúncio */
+export function converterWindsor(data) {
+  const somaCamp = new Map(); const ents = new Map(); const ult = new Map();
+  for (const r of data) {
+    const k = kDeAct(r.account_id); const cid = String(r.campaign_id || ''), sid = String(r.adset_id || ''), aid = String(r.ad_id || '');
+    if (!k || !cid || !sid || !aid || !r.date) continue;
+    const s = somaCamp.get(cid) || { lead: 0, conversa: 0, compra: 0 }; s.lead += num(r.actions_lead); s.conversa += num(r[F_CONVERSA]); s.compra += num(r.actions_purchase); somaCamp.set(cid, s);
+    const d = String(r.date).slice(0, 10); const novo = !ult.has(aid) || d >= ult.get(aid); if (novo) ult.set(aid, d);
+    if (novo || !ents.has(cid)) ents.set(cid, { id: cid, nivel: 'campanha', nome: String(r.campaign || cid), status: stDe(r.campaign_effective_status), campanhaId: cid, conta: k, objetivo: r.campaign_objective || null });
+    if (novo || !ents.has(sid)) ents.set(sid, { id: sid, nivel: 'conjunto', nome: String(r.adset_name || sid), paiId: cid, campanhaId: cid, status: stDe(r.adset_effective_status), orcamentoDia: r.adset_daily_budget == null || r.adset_daily_budget === '' ? 0 : Math.round(num(r.adset_daily_budget)) / 100, conta: k });
+    if (novo || !ents.has(aid)) ents.set(aid, { id: aid, nivel: 'anuncio', nome: String(r.ad_name || aid), paiId: sid, campanhaId: cid, status: stDe(r.effective_status), conta: k });
+  }
+  const tipo = new Map([...ents.values()].filter(e => e.nivel === 'campanha').map(e => [e.id, tipoDe(e.objetivo, somaCamp.get(e.id) || {})]));
+  ents.forEach(e => { e.tipo = tipo.get(e.campanhaId) || 'engaj'; });
+  const rows = [];
+  for (const r of data) {
+    const k = kDeAct(r.account_id); const aid = String(r.ad_id || ''); if (!k || !aid || !r.date || !ents.has(aid)) continue;
+    const t = tipo.get(String(r.campaign_id)); const impressions = num(r.impressions);
+    const row = { id: `vv-${aid}-${String(r.date).slice(0, 10)}`, conta: k, account_id: `act_${normAct(r.account_id)}`, date: String(r.date).slice(0, 10), campaign_id: String(r.campaign_id), adset_id: String(r.adset_id), ad_id: aid,
+      spend: num(r.spend), impressions, clicks: num(r.clicks), reach: num(r.reach), frequency: num(r.frequency) || (num(r.reach) ? impressions / num(r.reach) : 0) };
+    if (t === 'lead') row.actions_lead = num(r.actions_lead);
+    else if (t === 'conversa') row[F_CONVERSA] = num(r[F_CONVERSA]);
+    else if (t === 'compra') { row.actions_purchase = num(r.actions_purchase); row.action_values_purchase = num(r.action_values_purchase); }
+    else row.actions_post_engagement = num(r.actions_post_engagement);
+    if (r.actions_video_view != null) row.actions_video_view = num(r.actions_video_view);
+    rows.push(row);
+  }
+  return { rows, ents };
+}
+/** busca as duas contas ao vivo (só produção; a Edge Function confere Dono/Admin) */
+export async function carregarVivo(o = {}) {
+  if (db.dadosDemo || vivo.carregando) return;
+  if (!db.supabase) { if (!vivo.erro) { vivo.erro = 'Sem conexão com o servidor.'; avisarVivo(); } return; }
+  if (!o.forcar && vivo.rows && Date.now() - Date.parse(vivo.em) < 5 * 60e3) return;
+  vivo.carregando = true; vivo.erro = null; avisarVivo();
+  const ids = CONTAS.map(c => c.id).join(',');
+  const chamar = async body => {
+    const { data, error } = await db.supabase.functions.invoke('windsor-proxy', { body });
+    if (error) { let msg = error.message || 'Falha ao buscar os dados.'; try { const j = await error.context.json(); if (j && j.erro) msg = j.erro; } catch (e) { /* sem corpo */ } throw new Error(msg); }
+    return data;
+  };
+  try {
+    const [dados, est] = await Promise.all([
+      chamar({ date_preset: `last_${DIAS_VIVO - 1}dT`, select_accounts: ids, fields: CAMPOS_VIVO }),
+      chamar({ date_preset: 'last_730d', select_accounts: ids, fields: ['account_id', 'account_name', 'account_status'] }).catch(() => null),
+    ]);
+    const { rows, ents } = converterWindsor((dados && dados.data) || []);
+    const contas = {};
+    ((est && est.data) || []).forEach(r => { const k = kDeAct(r.account_id); if (k) contas[k] = { nome: r.account_name || null, status: r.account_status || null }; });
+    Object.assign(vivo, { rows, ents, contas, em: (dados && dados.atualizadoEm) || new Date().toISOString() });
+  } catch (e) { vivo.erro = e.message || String(e); }
+  finally { vivo.carregando = false; avisarVivo(); }
+}
+
+const METAS_PADRAO = { lead: 9, conversa: 45, compra: 300, engaj: 0.3, roas: 3 };
+/** registro da conta: demo = 'demo' (semente); produção = registro 'propria' (decisões, metas) + estado ao vivo */
+export const conta = () => {
+  if (db.dadosDemo) return db.get('campaignAccount', 'demo') || db.list('campaignAccount')[0] || null;
+  const r = db.get('campaignAccount', 'propria') || {};
+  const cs = contaSel();
+  return { id: 'propria', plataforma: 'Meta Ads', fonte: 'Windsor.ai', moeda: 'BRL', fuso: 'America/Sao_Paulo', decisoes: {}, ...r, metas: { ...METAS_PADRAO, ...(r.metas || {}) },
+    nome: cs ? cs.nome : 'CA01 + CA02 · HOF (somadas)', accountId: cs ? cs.id : CONTAS.map(c => c.id).join(', '), conectada: !!vivo.rows, ultimaSync: vivo.em, quebras: null };
+};
+/** produção: cria o registro 'propria' antes da primeira decisão gravada */
+export function garantirConta() {
+  if (db.dadosDemo || db.get('campaignAccount', 'propria')) return;
+  db.insert('campaignAccount', { id: 'propria', nome: 'Contas próprias (CA01 e CA02 · HOF)', decisoes: {}, metas: { ...METAS_PADRAO } });
+}
+const baseRows = () => (db.dadosDemo ? db.list('campaignDaily') : vivo.rows || []);
+const baseEnts = () => (db.dadosDemo ? db.list('campaigns') : vivo.ents ? [...vivo.ents.values()] : []);
+export const linhas = () => memo('linhas', () => baseRows().filter(daSel).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0)));
+export const entidades = () => memo('ent', () => { const m = new Map(); baseEnts().filter(daSel).forEach(c => m.set(c.id, c)); return m; });
 export const limites = () => memo('lim', () => { const l = linhas(); return l.length ? { min: l[0].date, max: l[l.length - 1].date } : null; });
+/** totais por conta (comparativo CA01 × CA02 na visão "As duas") */
+export function porConta(ini, fim) {
+  return CONTAS.map(c => ({ ...c, m: agregar(baseRows().filter(r => contaDe(r) === c.k && r.date >= ini && r.date <= fim)) }));
+}
 
 const addDias = (iso, n) => { const d = fmt.toDate(iso); d.setDate(d.getDate() + n); return fmt.iso(d); };
 const diff = (a, b) => Math.round((fmt.toDate(b) - fmt.toDate(a)) / 864e5) + 1;

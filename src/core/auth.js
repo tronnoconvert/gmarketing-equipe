@@ -17,6 +17,83 @@ const emit = () => listeners.forEach(fn => { try { fn(); } catch (e) { console.e
 const pub = u => (u ? { id: u.id, nome: u.nome, email: u.email, papel: u.papel, teamId: u.teamId, avatarCor: u.avatarCor, cargo: u.cargo, ativo: u.ativo !== false } : null);
 const emailOk = e => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(e || '').trim());
 let pendente = null; // produção: login feito com senha provisória, aguardando a senha nova ({u})
+let pendente2fa = null; // login com senha certa aguardando o código de 6 dígitos (aal2): {email, u?}
+let mfaAtivo = null; // a pessoa logada tem verificação em duas etapas? null = ainda não sabemos
+const mfaOuvintes = new Set();
+const mfaSet = v => { if (mfaAtivo === v) return; mfaAtivo = v; mfaOuvintes.forEach(f => { try { f(v); } catch (e) { console.error(e); } }); emit(); };
+export const MFA_CODIGO_DEMO = '123456';
+const CODIGO_RE = /^\d{6}$/;
+const SEGREDO_DEMO = 'GMKT DEMO 2FA7 QX4L'; // fictício
+/** QR fictício (modo demonstração): padrão determinístico em SVG, não é um QR válido */
+function qrDemo() {
+  let x = 7; const r = () => { x = (x * 1103515245 + 12345) & 0x7fffffff; return x / 0x7fffffff; };
+  const n = 25; let cel = '';
+  const marca = (cx, cy) => `<rect x="${cx}" y="${cy}" width="7" height="7" fill="#0E1726"/><rect x="${cx + 1}" y="${cy + 1}" width="5" height="5" fill="#fff"/><rect x="${cx + 2}" y="${cy + 2}" width="3" height="3" fill="#0E1726"/>`;
+  for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) { const canto = (i < 8 && j < 8) || (i < 8 && j > n - 9) || (i > n - 9 && j < 8); if (!canto && r() > 0.52) cel += `<rect x="${j}" y="${i}" width="1" height="1" fill="#0E1726"/>`; }
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-2 -2 ${n + 4} ${n + 4}" shape-rendering="crispEdges"><rect x="-2" y="-2" width="${n + 4}" height="${n + 4}" fill="#fff"/>${cel}${marca(0, 0)}${marca(n - 7, 0)}${marca(0, n - 7)}</svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+const erroMfa = m => (/invalid|expired|incorrect/i.test(m || '') ? 'Código incorreto ou expirado. Confira o relógio do celular e digite o código que aparece agora.' : `Não foi possível verificar: ${m}`);
+/** verificação em duas etapas (TOTP do Supabase; no modo demonstração tudo é simulado) */
+export const mfa = {
+  get ativo() { return mfaAtivo; },
+  onChange(fn) { mfaOuvintes.add(fn); return () => mfaOuvintes.delete(fn); },
+  /** fatores TOTP: [{id, nome, verificado, criadoEm}] */
+  async listar() {
+    if (db.mode === 'supabase' && db.supabase) {
+      const { data, error } = await db.supabase.auth.mfa.listFactors();
+      if (error) throw new Error(error.message);
+      const l = ((data && data.all) || (data && data.totp) || []).filter(f => f.factor_type === 'totp').map(f => ({ id: f.id, nome: f.friendly_name || 'Aplicativo autenticador', verificado: f.status === 'verified', criadoEm: f.created_at }));
+      mfaSet(l.some(f => f.verificado)); return l;
+    }
+    const u = sess && db.get('users', sess.userId); const f = u && u.mfaDemo;
+    const l = f ? [{ id: f.id, nome: f.nome, verificado: true, criadoEm: f.criadoEm }] : [];
+    mfaSet(l.length > 0); return l;
+  },
+  /** começa o cadastro: devolve {id, qr (imagem), segredo} */
+  async iniciar(nome = 'Celular') {
+    nome = String(nome || '').trim().slice(0, 40) || 'Celular';
+    if (db.mode === 'supabase' && db.supabase) {
+      const sb = db.supabase;
+      // cadastros abandonados (não verificados) atrapalham um novo: remove antes
+      try { const { data } = await sb.auth.mfa.listFactors(); for (const f of ((data && data.all) || []).filter(f => f.factor_type === 'totp' && f.status !== 'verified')) await sb.auth.mfa.unenroll({ factorId: f.id }); } catch (e) { /* segue */ }
+      const { data, error } = await sb.auth.mfa.enroll({ factorType: 'totp', friendlyName: `${nome} · ${new Date().toISOString().slice(0, 16)}` });
+      if (error) throw new Error(/aal2|assurance/i.test(error.message) ? 'Para adicionar outro aparelho, saia e entre de novo usando o código do aparelho atual.' : error.message);
+      const q = String(data.totp.qr_code || ''); // o servidor devolve SVG puro; o supabase-js às vezes já transforma em data URI
+      return { id: data.id, qr: q.startsWith('data:') ? q : `data:image/svg+xml;utf8,${encodeURIComponent(q)}`, segredo: data.totp.secret, uri: data.totp.uri };
+    }
+    return { id: `mfa-demo-${Date.now().toString(36)}`, qr: qrDemo(), segredo: SEGREDO_DEMO, nome, demo: true };
+  },
+  /** confirma o cadastro com o 1º código do aplicativo */
+  async confirmar(id, codigo, nome = 'Celular') {
+    codigo = String(codigo || '').replace(/\s/g, '');
+    if (!CODIGO_RE.test(codigo)) return { ok: false, erro: 'Digite os 6 números que aparecem no aplicativo.' };
+    if (db.mode === 'supabase' && db.supabase) {
+      const { error } = await db.supabase.auth.mfa.challengeAndVerify({ factorId: id, code: codigo });
+      if (error) return { ok: false, erro: erroMfa(error.message) };
+      await this.listar().catch(() => null); return { ok: true };
+    }
+    if (codigo !== MFA_CODIGO_DEMO) return { ok: false, erro: `Código incorreto. No modo demonstração use ${MFA_CODIGO_DEMO}.` };
+    db.update('users', sess.userId, { mfaDemo: { id, nome: String(nome || 'Celular'), criadoEm: new Date().toISOString() } }, { log: 'ativou a verificação em duas etapas' });
+    mfaSet(true); return { ok: true };
+  },
+  async remover(id) {
+    if (db.mode === 'supabase' && db.supabase) {
+      const { error } = await db.supabase.auth.mfa.unenroll({ factorId: id });
+      if (error) return { ok: false, erro: /aal2|assurance/i.test(error.message) ? 'Para remover, saia e entre de novo usando o código do aplicativo (confirma que é você).' : error.message };
+      await this.listar().catch(() => null); return { ok: true };
+    }
+    db.update('users', sess.userId, { mfaDemo: null }, { log: 'desligou a verificação em duas etapas' });
+    mfaSet(false); return { ok: true };
+  },
+  /** produção: a sessão atual precisa do código (aal1 com fator verificado)? */
+  async precisaCodigo() {
+    if (db.mode !== 'supabase' || !db.supabase) return false;
+    const { data, error } = await db.supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    if (error || !data) return false;
+    return data.nextLevel === 'aal2' && data.currentLevel !== 'aal2';
+  },
+};
 export const SENHA_MIN = 10;
 /** força da senha: 0..4 + dica (mostrada na tela "Crie sua nova senha") */
 export function forcaSenha(s) {
@@ -59,22 +136,58 @@ export const auth = {
       if (!sb) return { ok: false, erro: 'Não foi possível conectar ao servidor. Verifique sua internet e tente de novo.' };
       const { data, error } = await sb.auth.signInWithPassword({ email, password: senha });
       if (error) return { ok: false, erro: /invalid/i.test(error.message) ? 'E-mail ou senha incorretos. Confira e tente de novo.' : `Não foi possível entrar: ${error.message}` };
+      // verificação em duas etapas: com fator verificado, nada é carregado antes do código de 6 dígitos (aal2)
+      if (await mfa.precisaCodigo().catch(() => false)) { pendente2fa = { email, authId: data.user.id }; return { ok: false, pedir2fa: true }; }
+      return this._posLogin(data.user, email);
+    } else {
+      u = db.find('users', x => String(x.email).toLowerCase() === email);
+      if (!u || u.senha !== senha) return { ok: false, erro: 'E-mail ou senha incorretos. Confira e tente de novo.' };
+      if (u.ativo !== false && u.mfaDemo) { pendente2fa = { email, u }; return { ok: false, pedir2fa: true }; }
+    }
+    if (u.ativo === false) return { ok: false, erro: 'Seu acesso está desativado. Fale com o administrador para reativar.' };
+    return this._entrar(u);
+  },
+  /** produção: depois da senha (e do código, se houver) carrega os dados e entra */
+  async _posLogin(authUser, email) {
+    const sb = db.supabase; let u;
+    {
+      const data = { user: authUser };
       try { await db.reload(); } catch (e) { await sb.auth.signOut(); return { ok: false, erro: 'Entrou, mas não foi possível carregar seus dados. Tente de novo em instantes.' }; }
       u = db.find('users', x => x.authId === data.user.id || String(x.email).toLowerCase() === email);
       if (!u) { await sb.auth.signOut(); return { ok: false, erro: 'Seu acesso ainda não foi configurado. Peça ao administrador para criar seu perfil.' }; }
       if (u.ativo === false) { await sb.auth.signOut(); return { ok: false, erro: 'Seu acesso está desativado. Fale com o administrador para reativar.' }; }
       const { data: pf } = await sb.from('profiles').select('trocar_senha').eq('user_id', data.user.id).maybeSingle();
       if (pf && pf.trocar_senha) { pendente = { u }; return { ok: false, trocarSenha: true, user: pub(u) }; }
-    } else {
-      u = db.find('users', x => String(x.email).toLowerCase() === email);
-      if (!u || u.senha !== senha) return { ok: false, erro: 'E-mail ou senha incorretos. Confira e tente de novo.' };
     }
-    if (u.ativo === false) return { ok: false, erro: 'Seu acesso está desativado. Fale com o administrador para reativar.' };
     return this._entrar(u);
   },
+  get pede2fa() { return !!pendente2fa; },
+  /** segunda etapa do login: código de 6 dígitos do aplicativo autenticador */
+  async verificar2fa(codigo) {
+    codigo = String(codigo || '').replace(/\s/g, '');
+    if (!pendente2fa) return { ok: false, erro: 'Entre de novo com e-mail e senha.' };
+    if (!CODIGO_RE.test(codigo)) return { ok: false, erro: 'Digite os 6 números que aparecem no aplicativo autenticador.' };
+    if (db.mode === 'supabase' && db.supabase) {
+      const sb = db.supabase;
+      const { data: fs, error: e1 } = await sb.auth.mfa.listFactors();
+      if (e1) return { ok: false, erro: `Não foi possível verificar: ${e1.message}` };
+      const f = ((fs && fs.totp) || []).find(x => x.status === 'verified');
+      if (!f) return { ok: false, erro: 'Nenhum aplicativo autenticador encontrado. Entre de novo.' };
+      const { error } = await sb.auth.mfa.challengeAndVerify({ factorId: f.id, code: codigo });
+      if (error) return { ok: false, erro: erroMfa(error.message) };
+      const { data: us } = await sb.auth.getUser();
+      const p = pendente2fa; pendente2fa = null; mfaSet(true);
+      return this._posLogin((us && us.user) || { id: p.authId }, p.email);
+    }
+    if (codigo !== MFA_CODIGO_DEMO) return { ok: false, erro: `Código incorreto. No modo demonstração o código é ${MFA_CODIGO_DEMO}.` };
+    const u = pendente2fa.u; pendente2fa = null;
+    if (u.ativo === false) return { ok: false, erro: 'Seu acesso está desativado. Fale com o administrador para reativar.' };
+    const r = this._entrar(u); mfaSet(true); return r;
+  },
+  async cancelar2fa() { pendente2fa = null; if (db.mode === 'supabase' && db.supabase) { try { await db.supabase.auth.signOut(); } catch (e) { /* ignora */ } } },
   _entrar(u, extra = {}) {
     sess = { userId: u.id, verComo: null, desde: new Date().toISOString() };
-    gravarSessao(sess);
+    gravarSessao(sess); mfaAtivo = null; setTimeout(() => { mfa.listar().catch(() => null); }, 0);
     db.update('users', u.id, { ultimoAcesso: new Date().toISOString(), ...extra });
     emit();
     return { ok: true, user: pub(u) };
@@ -100,7 +213,7 @@ export const auth = {
   async cancelarTroca() { pendente = null; if (db.supabase) { try { await db.supabase.auth.signOut(); } catch (e) { /* ignora */ } } },
   async logout() {
     if (db.mode === 'supabase' && db.supabase) { try { await db._pendentes(); await db.supabase.auth.signOut(); } catch (e) { /* ignora */ } }
-    sess = null; gravarSessao(null); emit();
+ sess = null; gravarSessao(null); mfaAtivo = null; emit();
   },
   /** "ver como" (só dono/admin) */
   verComo(userId) {
@@ -129,6 +242,9 @@ export const auth = {
       // senha provisória ainda não trocada: não entra direto (precisa passar pela tela "Crie sua nova senha")
       const { data: pf } = await db.supabase.from('profiles').select('trocar_senha').eq('user_id', su.id).maybeSingle();
       if (pf && pf.trocar_senha) { await db.supabase.auth.signOut(); sess = null; gravarSessao(null); return; }
+      // sessão que parou na senha (sem o código de 6 dígitos): volta para o login
+      if (await mfa.precisaCodigo().catch(() => false)) { await db.supabase.auth.signOut(); sess = null; gravarSessao(null); return; }
+      setTimeout(() => { mfa.listar().catch(() => null); }, 0);
       if (u && (!sess || sess.userId !== u.id)) { sess = { userId: u.id, verComo: null }; gravarSessao(sess); }
     } catch (e) { console.warn('[Gmarketing] sessão indisponível', e && e.message); }
   },
@@ -202,6 +318,7 @@ export const auth = {
       const r = await this.login(email, senha);
       go.disabled = false; go.textContent = 'Entrar';
       if (r.trocarSenha) { this.renderTrocaSenha(root, r.user, onOk); return; }
+      if (r.pedir2fa) { this.render2fa(root, onOk); return; }
       if (!r.ok) { mostrar(r.erro); f.senha.focus(); return; }
       onOk && onOk(r.user);
     };
@@ -220,6 +337,37 @@ export const auth = {
     if (this._pararCena) this._pararCena();
     this._pararCena = iniciarCenaLogin(root);
     setTimeout(() => { if (!f.contains(document.activeElement)) f.email.focus(); }, 30);
+  },
+
+ /** 2ª etapa do login: código de 6 dígitos */
+  render2fa(root, onOk) {
+    const card = root.querySelector('.lg-card');
+    card.innerHTML = `<span class="lg-card-glow" aria-hidden="true"></span>
+      <div class="lg-brand lg-brand-m"><span class="brand-mk brand-g" aria-hidden="true">G</span><b>Gmarketing</b></div>
+      <h1>Verificação em duas etapas</h1>
+      <p class="lg-sub">Abra o aplicativo autenticador do seu celular (Google Authenticator, Microsoft Authenticator, 1Password…) e digite o código de 6 números da Gmarketing.</p>
+      <form class="lg-form lg-2fa" novalidate>
+        <div class="fld"><label for="lg-cod">Código de 6 dígitos</label><input id="lg-cod" name="cod" class="lg-cod num" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" maxlength="7" placeholder="000 000" required aria-describedby="lg-cod-d">
+          <p class="fld-d" id="lg-cod-d">${db.mode === 'supabase' ? 'O código muda a cada 30 segundos.' : `Modo demonstração: o código é ${MFA_CODIGO_DEMO}.`}</p></div>
+        <p class="lg-err" role="alert" aria-live="assertive" hidden></p>
+        <button class="btn pri lg-go" type="submit">Verificar e entrar</button>
+        <button class="btn ghost" type="button" data-cancelar-2fa>Voltar ao login</button>
+        <p class="sm mut lg-2fa-aj">Perdeu o celular? Peça ao administrador para remover a verificação do seu acesso (Supabase › Authentication › Users).</p>
+      </form>`;
+    const f = card.querySelector('form'), err = card.querySelector('.lg-err'), go = card.querySelector('.lg-go');
+    const mostrar = m => { err.hidden = !m; err.textContent = m || ''; };
+    f.cod.addEventListener('input', () => { const v = f.cod.value.replace(/\D/g, '').slice(0, 6); f.cod.value = v.length > 3 ? `${v.slice(0, 3)} ${v.slice(3)}` : v; if (v.length === 6) f.requestSubmit(); });
+    card.querySelector('[data-cancelar-2fa]').addEventListener('click', async () => { await this.cancelar2fa(); this.renderLogin(root, onOk); });
+    f.addEventListener('submit', async e => {
+      e.preventDefault(); if (go.disabled) return;
+      go.disabled = true; go.textContent = 'Verificando…'; mostrar('');
+      const r = await this.verificar2fa(f.cod.value);
+      go.disabled = false; go.textContent = 'Verificar e entrar';
+      if (r.trocarSenha) { this.renderTrocaSenha(root, r.user, onOk); return; }
+      if (!r.ok) { mostrar(r.erro); f.cod.value = ''; f.cod.focus(); return; }
+      onOk && onOk(r.user);
+    });
+    setTimeout(() => f.cod.focus(), 30);
   },
 
   /** produção: "Crie sua nova senha" (obrigatória no 1º acesso com senha provisória) */

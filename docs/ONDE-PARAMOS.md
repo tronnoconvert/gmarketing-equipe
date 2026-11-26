@@ -10,7 +10,18 @@
 5. Token Meta (usuário do sistema) para Pausar/Orçamento — passos em DEPLOY §8 / relatório item 17.
 
 ## Minha parte
-- Agente em andamento ao parar: gestores veem TODOS os clientes (padrão "Meus", botão Meus/Todos), SEM limite de alterações de verba (dono removeu),
+- 26/11 (2ª etapa) — PUBLICADO no ramo producao:
+  - **Campanha com 2 contas** (CA01 e CA02 · HOF): seletor "As duas (somadas) / CA01 / CA02 · HOF" na URL (`?conta=`), card "Por conta",
+    dados reais AO VIVO pela `windsor-proxy` (Dono/Admin; 180 dias + hoje), demonstração com 2 contas fictícias. Aviso "Sem veiculação
+    desde…" (CA01: último gasto 03/07/2026; CA02 · HOF: nenhum gasto na Windsor). Pausar/orçamento nas contas reais: ainda não ligado.
+  - **windsor-proxy** republicada: today/yesterday/this_month/last_month/this_year viram date_from/date_to; aceita last_XdT;
+    select_accounts com as duas contas. Teste real `tests/live/campanha.mjs` 13/13 (limpo).
+  - **2FA (TOTP)**: Minha conta (`#/conta`, menu do perfil) com QR, código, lista/remoção; login pede o código de 6 dígitos (aal2)
+    para quem ativou; faixa "Proteja seu acesso" para Dono/Admin sem 2FA (não obrigatório ainda). Teste real `tests/live/mfa.mjs` 7/7.
+  - `supabase/tests/supabase_stub.sql` com storage/extensions: `rls_test.sql` passa no Postgres local.
+  - Teste do quadro (arrastar) corrigido: cartão abaixo da dobra da tela.
+- **Pedir ao dono e à Rayane**: ativar a verificação em duas etapas (menu do perfil › Minha conta e segurança). Depois disso posso torná-la obrigatória.
+- PUBLICADO 26/11 no ramo producao (2b86572): Painel de Voo real, sem dados fictícios, backups + cartão, auditoria, gestores veem todos, sem limite de verba + auditoria deOutroGestor. Bateria 3995/3995.
   auditoria mostra quando um gestor altera cliente de outro (flag deOutroGestor + notificação ao responsável e dono/admin). Se não terminou, retomar.
 - Depois: rodar bateria completa, publicar no ramo `producao` (Netlify publica sozinho) incluindo netlify.toml do main (CSP/HSTS) — testar CSP no site.
 - Agendar auditoria semanal (comando em docs/BACKUP-E-RESTAURACAO.md §Auditoria) e conferir 1º backup diário (03:10) e cron aos-voo-dados.

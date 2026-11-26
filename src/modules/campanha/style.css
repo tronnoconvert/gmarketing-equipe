@@ -164,3 +164,8 @@
 .m-campanha-rgk{grid-template-columns:repeat(4,minmax(0,1fr))}
 @media (max-width:900px){.m-campanha-rgk{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .m-campanha-pm{align-content:start}
+/* seletor de conta (CA01 / CA02 / as duas) */
+.m-campanha-contas{gap:12px;flex-wrap:wrap;align-items:center;margin:-4px 0 12px}
+.m-campanha-contas .sm{min-width:0;overflow-wrap:anywhere}
+.m-campanha-pc td a{color:inherit;text-decoration:none}
+.m-campanha-pc td a:hover b{text-decoration:underline}
