@@ -13,5 +13,6 @@ import campanha from './campanha/index.js';
 import notificacoes from './notificacoes/index.js';
 import padroes from './padroes/index.js';
 import admin from './admin/index.js';
+import conta from './conta/index.js';
 
-export default [mesa, cockpit, financeiro, clientes, operacao, equipe, torre, comercial, alertas, webinars, campanha, notificacoes, padroes, admin];
+export default [mesa, cockpit, financeiro, clientes, operacao, equipe, torre, comercial, alertas, webinars, campanha, notificacoes, padroes, admin, conta];

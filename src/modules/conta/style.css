@@ -1,0 +1,16 @@
+.m-conta-passos{margin:0;padding-left:20px;display:grid;gap:14px}
+.m-conta-passos>li{padding-left:4px;line-height:1.5}
+.m-conta-qr{display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-top:10px}
+.m-conta-qr img{width:176px;height:176px;border-radius:10px;background:#fff;padding:8px;border:1px solid var(--bd);box-sizing:border-box}
+.m-conta-sg{display:grid;gap:6px;min-width:0;max-width:280px}
+.m-conta-sg code{font-size:13px;letter-spacing:.06em;overflow-wrap:anywhere;padding:6px 8px;border-radius:6px;background:var(--bg2,rgba(127,127,127,.1))}
+.m-conta-cf{display:grid;gap:10px;margin-top:10px;max-width:320px}
+.m-conta-cf [data-codigo]{font-size:20px;letter-spacing:.18em;font-variant-numeric:tabular-nums}
+.m-conta-err{color:var(--err);font-size:13px;margin:0}
+.mfa-ban{display:flex;align-items:center;justify-content:center;gap:10px;padding:8px 16px;background:#B45309;color:#fff;font-size:13px;flex-wrap:wrap;text-align:center}
+.mfa-ban .ic{width:16px;height:16px}
+.mfa-ban a{color:#fff;font-weight:600;border:1px solid currentColor;border-radius:7px;padding:3px 10px;text-decoration:none}
+.mfa-ban a:hover{background:rgba(255,255,255,.16)}
+.mfa-ban button{background:none;border:0;color:inherit;opacity:.85;font-size:12.5px;text-decoration:underline;cursor:pointer}
+.lg-cod{font-size:22px;letter-spacing:.2em;text-align:center;font-variant-numeric:tabular-nums}
+.lg-2fa-aj{margin:4px 0 0;font-size:12.5px;opacity:.75}

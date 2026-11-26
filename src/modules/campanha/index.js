@@ -6,7 +6,7 @@ import './data.js';
 import { db } from '../../core/store.js';
 import { auth } from '../../core/auth.js';
 import * as fmt from '../../core/fmt.js';
-import { TIPOS, conta, linhas, entidades, limites, janela, noIntervalo, agregar, porChave, doTipo, serieDiaria, orcamentoConta, estaAtivo, recomendacoes, pendentes, quebra, MotorRecs, logar, COL_LOG, estatisticas, avaliarPendentes, overrides, regrasAtuais } from './engine.js';
+import { TIPOS, conta, linhas, entidades, limites, janela, noIntervalo, agregar, porChave, doTipo, serieDiaria, orcamentoConta, estaAtivo, recomendacoes, pendentes, quebra, MotorRecs, logar, COL_LOG, estatisticas, avaliarPendentes, overrides, regrasAtuais, CONTAS, SOMA, selecionar, selecao, contaSel, vivo, carregarVivo, ouvirVivo, garantirConta, porConta, DIAS_VIVO } from './engine.js';
 import { regrasAba, montarRegras } from './regras.js';
 import { padrao } from '../../core/padroes/index.js';
 
@@ -49,16 +49,38 @@ export function thumb(cr, o = {}) {
 /* ---------------- cabeçalho / abas ---------------- */
 function topo(ctx, aba) {
   const { ui } = ctx; const c = conta() || {}; const lim = limites();
-  const ledC = c.conectada ? ui.led('ok', `Conectada · ${c.accountId}`) : ui.led('off', ctx.db.dadosDemo ? 'Demonstração · conta ainda não conectada' : 'Conta ainda não conectada');
+  const cs = contaSel();
+  const ledC = !db.dadosDemo ? (vivo.erro ? ui.led('err', 'Falha ao buscar no Windsor') : vivo.carregando && !vivo.rows ? ui.led('off', 'Buscando no Windsor…') : ui.led('ok', `Ao vivo · ${cs ? cs.curto : 'CA01 + CA02 · HOF'}`))
+    : ui.led('off', `Demonstração · ${cs ? cs.nome : 'duas contas fictícias somadas'}`);
   const n = pendentes().length;
   return `${ui.cabecalho({
     titulo: 'Campanha', sub: 'Sua conta própria de tráfego (Meta Ads via Windsor.ai): resultado, criativos e as decisões que valem a pena tomar hoje.',
     meta: `${ledC}<span class="mut">Última sincronização ${ui.rel(c.ultimaSync)}</span>${lim ? `<span class="mut">Dados até ${fmt.data(lim.max)}</span>` : ''}`,
     acoes: `<span class="m-campanha-4g" title="Regra de segurança da conta">${ui.ic('shield')}${esc(NOTA_4G)}</span>`,
   })}
+${seletorConta(ctx)}
 ${ui.tabs([{ id: '', rotulo: 'Visão geral', n: n || undefined }, { id: 'campanhas', rotulo: 'Campanhas' }, { id: 'criativos', rotulo: 'Criativos' }, { id: 'regras', rotulo: 'Regras da IA' }, { id: 'conexao', rotulo: 'Conexão' }], aba === 'visao' ? '' : aba, 'campanha')}`;
 }
 
+/** seletor de conta (fica na URL: ?conta=ca01|ca02; sem o parâmetro = as duas somadas) */
+function seletorConta(ctx) {
+  const { ui } = ctx; const s = selecao();
+  return `<div class="row m-campanha-contas">${ui.chips([{ id: SOMA, rotulo: 'As duas (somadas)' }, ...CONTAS.map(c => ({ id: c.k, rotulo: c.curto }))], s, 'conta', { rotulo: 'Conta de anúncios' })}<span class="sm mut">${esc(s === SOMA ? CONTAS.map(c => c.nome).join(' + ') : (contaSel() || {}).nome || '')}</span></div>`;
+}
+/** comparativo CA01 × CA02 (só na visão "As duas") */
+function comparativoContas(ctx, j) {
+  const { ui } = ctx; if (selecao() !== SOMA) return '';
+  const l = porConta(j.ini, j.fim); const tot = l.reduce((a, x) => a + (x.m.spend || 0), 0);
+  const linha = x => `<tr><td><a href="${esc(ctx.router.href(null, { conta: x.k }))}"><b>${esc(x.curto)}</b></a><div class="sm mut">${esc(x.nome)}</div></td><td class="n num">${fmt.brl(x.m.spend)}</td><td class="n num">${tot ? fmt.pct((x.m.spend / tot) * 100, 0) : '—'}</td><td class="n num">${fmt.num(x.m.resultados)}</td><td class="n num">${nz(x.m.cpr, fmt.brl2)}</td><td class="n num">${nz(x.m.ctr, v => fmt.pct(v, 2))}</td><td class="n num">${nz(x.m.roas, v => fmt.dec(v, 2) + '×')}</td></tr>`;
+  return ui.card({ titulo: 'Por conta', sub: `${fmt.data(j.ini)} a ${fmt.data(j.fim)} · clique numa conta para ver só ela`, ajuda: 'Os indicadores acima somam as duas contas. Aqui está a parte de cada uma no mesmo período.',
+    corpo: `<div class="tbl-w" data-mobile="scroll"><table class="tbl densa m-campanha-pc"><thead><tr><th>Conta</th><th class="n">Invest.</th><th class="n">% verba</th><th class="n">Result.</th><th class="n">Custo/result.</th><th class="n">CTR</th><th class="n">ROAS</th></tr></thead><tbody>${l.map(linha).join('')}</tbody></table></div>` });
+}
+/** produção: aviso quando a última veiculação é antiga (a janela termina no último dia com dados) */
+function avisoParada(ctx) {
+  if (db.dadosDemo) return ''; const lim = limites(); if (!lim) return '';
+  const dias = Math.round((fmt.toDate(fmt.iso(new Date())) - fmt.toDate(lim.max)) / 864e5);
+  return dias > 2 ? ctx.ui.aviso({ tipo: 'warn', titulo: `Sem veiculação desde ${fmt.data(lim.max)}`, texto: `Nenhum gasto ${selecao() === SOMA ? 'nas duas contas' : 'nesta conta'} nos últimos ${dias} dias. Os números abaixo são dos últimos dias com dados.` }) : '';
+}
 function filtros(ctx, j) {
   const { ui, router } = ctx;
   const d = String(ctx.query.dias || '');
@@ -71,7 +93,7 @@ function filtros(ctx, j) {
 /* ---------------- VISÃO ---------------- */
 function visao(ctx) {
   const { ui, charts } = ctx; const j = janela(ctx); const c = conta();
-  if (!j) return ui.card({ corpo: ui.vazio({ icone: 'megaphone', titulo: 'Sem dados da conta', texto: 'Conecte a conta na aba Conexão para puxar os dados do Windsor.ai.', acao: { rotulo: 'Ir para Conexão', href: '#/campanha/conexao' } }) });
+  if (!j) return ui.card({ corpo: ui.vazio({ icone: 'megaphone', titulo: selecao() === SOMA ? 'Sem dados nas contas' : `Sem dados na ${(contaSel() || {}).curto}`, texto: db.dadosDemo ? 'Conecte a conta na aba Conexão para puxar os dados do Windsor.ai.' : `Nenhuma veiculação nos últimos ${DIAS_VIVO} dias${selecao() === SOMA ? ' nas duas contas' : ' nesta conta'}. Quando houver gasto, os números aparecem aqui sozinhos.`, acao: { rotulo: 'Ver Conexão', href: '#/campanha/conexao' } }) });
   const todas = linhas(); const rows = todas.filter(noIntervalo(j.ini, j.fim));
   const m = agregar(rows); const comparar = ctx.query.comparar !== '0' && j.comparavel;
   const a = comparar ? agregar(todas.filter(noIntervalo(j.iniAnt, j.fimAnt))) : {};
@@ -110,12 +132,14 @@ ${ui.kpi({ rotulo: 'Faturamento atribuído', valor: fmt.brlK(m.valor), ...delta(
   }).join('');
 
   return `${filtros(ctx, j)}
+${avisoParada(ctx)}
 ${j.limitado ? ui.aviso({ tipo: 'info', texto: 'A conta tem 90 dias de histórico na demonstração: "12 meses" mostra todo o histórico disponível, sem comparação.' }) : ''}
 ${kpis}
+${comparativoContas(ctx, j)}
 ${decisoesCard(ctx)}
 ${ui.card({ titulo: 'Dia a dia', sub: 'Investimento × resultados × CPL', ajuda: 'Linha tracejada no CPL = meta da conta. Passe o mouse para ver cada dia.', corpo: diario })}
 <div class="g2">${ui.card({ titulo: 'Funil da conta', sub: 'Impressões → cliques → leads e conversas → vendas', corpo: funil })}
-${ui.card({ titulo: 'Quebras', sub: `Custo por resultado por segmento · verde abaixo da média, vermelho 30% acima`, ajuda: 'Distribuição do período por publisher_platform/platform_position, age/gender e device_platform (Windsor). Na demonstração os percentuais são ilustrativos.', acoes: ui.seg(qb.map(k => ({ id: k, rotulo: qRot[k] })), qAtiva, { rotulo: 'Quebra', cls: 'm-campanha-qs' }), corpo: quebras })}</div>`;
+${!db.dadosDemo ? ui.card({ titulo: 'Quebras', sub: 'Posicionamento, idade, gênero e dispositivo', corpo: ui.vazio({ icone: 'chart', titulo: 'Em breve com dados reais', texto: 'As quebras por segmento precisam de consultas separadas no Windsor; por enquanto ficam só na demonstração.', compacto: true }) }) : ui.card({ titulo: 'Quebras', sub: `Custo por resultado por segmento · verde abaixo da média, vermelho 30% acima`, ajuda: 'Distribuição do período por publisher_platform/platform_position, age/gender e device_platform (Windsor). Na demonstração os percentuais são ilustrativos.', acoes: ui.seg(qb.map(k => ({ id: k, rotulo: qRot[k] })), qAtiva, { rotulo: 'Quebra', cls: 'm-campanha-qs' }), corpo: quebras })}</div>`;
 }
 
 const PRIO_LED = { agora: 'err', hoje: 'warn', semana: 'ok' };
@@ -253,7 +277,27 @@ ${x.fad === 'err' ? ui.aviso({ tipo: 'warn', titulo: 'Criativo saturado.', texto
 }
 
 /* ---------------- CONEXÃO ---------------- */
+/** produção: as duas contas reais, status na Windsor e atualização manual */
+function conexaoReal(ctx) {
+  const { ui } = ctx; const lim = limites();
+  const linha = c => {
+    const st = vivo.contas[c.k]; const n = (vivo.rows || []).filter(r => r.conta === c.k).length;
+    const ult = (vivo.rows || []).filter(r => r.conta === c.k && r.spend > 0).map(r => r.date).sort().pop();
+    const led = st ? (String(st.status).toUpperCase() === 'ACTIVE' ? ['ok', 'Ativa na Windsor'] : ['warn', `Status: ${st.status}`]) : ['off', 'Sem retorno da Windsor'];
+    return `<tr><td><b>${esc(c.curto)}</b><div class="sm mut">${esc((st && st.nome) || c.nome)}</div></td><td><code>${esc(c.id)}</code></td><td>${ui.led(led[0], led[1])}</td><td class="n num">${fmt.num(n)}</td><td>${ult ? fmt.data(ult) : '<span class="mut">sem gasto no período</span>'}</td></tr>`;
+  };
+  return `${ui.card({
+    titulo: 'Contas conectadas', icone: 'link', sub: `Meta Ads via Windsor.ai · últimos ${DIAS_VIVO} dias, por anúncio · atualizado ${ui.rel(vivo.em)}`,
+    acoes: ui.btn({ rotulo: vivo.carregando ? 'Atualizando…' : 'Atualizar agora', icone: 'refresh', sm: true, attrs: { 'data-recarregar': '' }, disabled: vivo.carregando }),
+    corpo: `<div class="tbl-w" data-mobile="scroll"><table class="tbl densa"><thead><tr><th>Conta</th><th>ID</th><th>Situação</th><th class="n">Linhas</th><th>Último gasto</th></tr></thead><tbody>${CONTAS.map(linha).join('')}</tbody></table></div>
+${vivo.erro ? ui.aviso({ tipo: 'err', titulo: 'A última busca falhou', texto: vivo.erro }) : ''}
+<p class="sm mut">Histórico carregado: ${lim ? `${fmt.data(lim.min)} a ${fmt.data(lim.max)}` : 'sem linhas'}.</p>
+${ui.aviso({ tipo: 'info', titulo: 'A chave do Windsor nunca passa pelo navegador.', texto: 'WINDSOR_API_KEY fica só no servidor (Edge Function windsor-proxy). A função confere se quem pede é Dono ou Admin e devolve apenas os números das duas contas.' })}
+${ui.aviso({ tipo: 'warn', titulo: NOTA_4G, texto: 'Por segurança este app não tem nenhum link para o Gerenciador de Anúncios.' })}`,
+  })}`;
+}
 function conexao(ctx) {
+  if (!db.dadosDemo) return conexaoReal(ctx);
   const { ui } = ctx; const c = conta() || {}; const pode = podeAlterar(ctx);
   const est = c.conectada ? ['ok', 'Conectada'] : c.accountId ? ['warn', 'Conta informada · aguardando a chave no servidor'] : ['off', 'Não conectada · dados de demonstração'];
   const exemplo = `GET ${'${SUPABASE_URL}'}/functions/v1/windsor-proxy?account=${c.accountId || 'act_1234567890'}&date_from=AAAA-MM-DD&date_to=AAAA-MM-DD
@@ -296,6 +340,7 @@ ${ui.campo({ nome: 'sim', rotulo: 'Digite SIM para confirmar', obrigatorio: true
 const LOG_DE = { aplicada: 'aceita', ignorada: 'recusada', adiada: 'adiada' };
 /** grava o estado da recomendação (campaignAccount.decisoes) e a entrada de aprendizado (recsLog). Devolve as decisões anteriores (Desfazer). */
 function registrarDecisao(id, estado, extra = {}, recObj = null) {
+  garantirConta();
   const c = conta(); const u = auth.real() || auth.user();
   const dec = { ...(c.decisoes || {}) }; const antes = c.decisoes || {};
   const rec = recObj || recomendacoes().find(x => x.id === id);
@@ -314,6 +359,7 @@ function desfazerDecisao(decAntes, id) {
   db.update('campaignAccount', conta().id, { decisoes: decAntes });
 }
 async function mudarStatus(ctx, id, novo, decisaoId, recObj) {
+  if (!db.dadosDemo) { ctx.ui.toast('Nas contas reais, pausar e mudar orçamento por aqui ainda não está ligado. ' + NOTA_4G, { tipo: 'warn' }); return; }
   const { ui } = ctx; const e = db.get('campaigns', id); if (!e) return false;
   novo = novo || (e.status === 'ativo' ? 'pausado' : 'ativo');
   const total = orcamentoConta(); let depois = total;
@@ -328,6 +374,7 @@ async function mudarStatus(ctx, id, novo, decisaoId, recObj) {
   return true;
 }
 async function mudarOrcamento(ctx, id, novoValor, decisaoId, recObj) {
+  if (!db.dadosDemo) { ctx.ui.toast('Nas contas reais, pausar e mudar orçamento por aqui ainda não está ligado. ' + NOTA_4G, { tipo: 'warn' }); return; }
   const { ui } = ctx; const e = db.get('campaigns', id); if (!e) return false;
   let valor = novoValor;
   if (valor == null) {
@@ -393,6 +440,18 @@ export default {
   watch: ['campaignAccount', 'campaigns', 'campaignDaily', 'creatives', 'settings', 'recsLog'],
   render(ctx) {
     const aba = ctx.params.aba || 'visao';
+    selecionar(ctx.query.conta);
+    if (!db.dadosDemo) {
+      const r = auth.real() || auth.user();
+      if (!r || !['dono', 'admin'].includes(r.papel)) return `<div class="pg m-campanha">${ctx.ui.cabecalho({ titulo: 'Campanha', sub: 'Contas próprias do dono (CA01 e CA02 · HOF).' })}${ctx.ui.card({ corpo: ctx.ui.vazio({ icone: 'lock', titulo: 'Só Dono e Admin', texto: 'Os números das contas próprias ficam visíveis só para o dono e a administradora.' }) })}</div>`;
+      if (!vivo.rows) {
+        carregarVivo();
+        const corpo = vivo.erro ? ctx.ui.vazio({ icone: 'alert', titulo: 'Não foi possível buscar as contas', texto: `${vivo.erro} Tente de novo em instantes.`, acao: { rotulo: 'Tentar de novo', attrs: { 'data-recarregar': '' } } })
+          : ctx.ui.vazio({ icone: 'refresh', titulo: 'Buscando CA01 e CA02 · HOF no Windsor…', texto: `Últimos ${DIAS_VIVO} dias, por anúncio. Leva alguns segundos.` });
+        return `<div class="pg m-campanha">${topo(ctx, aba)}${ctx.ui.card({ corpo })}</div>`;
+      }
+      carregarVivo(); // atualiza em segundo plano depois de 5 min
+    }
     const ABAS = { visao, campanhas, criativos, regras: regrasAba, conexao };
     try { avaliarPendentes(); } catch (e) { /* sem dados para avaliar */ }
     if (!ABAS[aba]) return `<div class="pg m-campanha">${topo(ctx, 'visao')}${ctx.ui.vazio({ icone: 'search', titulo: 'Aba não encontrada', texto: 'Escolha uma das abas acima.', acao: { rotulo: 'Visão geral', href: '#/campanha' } })}</div>`;
@@ -419,6 +478,7 @@ export default {
       const cr = t.closest('[data-cr]'); if (cr) { previa(ctx, cr.dataset.cr); return; }
       const sg = t.closest('.m-campanha-qs [data-seg]');
       if (sg) { el.querySelectorAll('[data-qb]').forEach(d => { d.hidden = d.dataset.qb !== sg.dataset.seg; }); ctx.router.setQuery({ quebra: sg.dataset.seg === 'posicionamento' ? null : sg.dataset.seg }); return; }
+      if (t.closest('[data-recarregar]')) { carregarVivo({ forcar: true }); return; }
       if (t.closest('[data-testar]')) { testar(el, ctx); return; }
       if (t.closest('[data-conectar]')) { conectar(el, ctx); return; }
       if (t.closest('[data-desconectar]')) { desconectar(ctx); }
@@ -427,7 +487,8 @@ export default {
     const onSub = e => { if (e.target.closest('.m-campanha-cx')) { e.preventDefault(); conectar(el, ctx); } };
     el.addEventListener('click', onClick); el.addEventListener('toggle', onToggle, true); el.addEventListener('submit', onSub);
     const off = (ctx.params.aba === 'regras') ? montarRegras(el, ctx) : null;
-    return () => { el.removeEventListener('click', onClick); el.removeEventListener('toggle', onToggle, true); el.removeEventListener('submit', onSub); if (off) off(); };
+    const offVivo = db.dadosDemo ? null : ouvirVivo(() => ctx.refresh());
+    return () => { if (offVivo) offVivo(); el.removeEventListener('click', onClick); el.removeEventListener('toggle', onToggle, true); el.removeEventListener('submit', onSub); if (off) off(); };
   },
   contador() {
     const p = pendentes(); const n = p.length; if (!n) return null;

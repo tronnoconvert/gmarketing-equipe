@@ -35,6 +35,26 @@ export default async function (t) {
   await page.click('.m-campanha-qs [data-seg="dispositivo"]'); await page.waitForTimeout(80);
   ok(await page.isVisible('[data-qb="dispositivo"]') && !(await page.isVisible('[data-qb="posicionamento"]')), 'troca de quebra');
 
+  step('duas contas: CA01 / CA02 / As duas (somadas)');
+  await t.ir('#/campanha?dias=30');
+  const invest = () => page.$eval('.m-campanha .kpi .kpi-v', e => Number(e.textContent.replace(/[^\d,]/g, '').replace(',', '.'))).catch(() => NaN);
+  ok(await page.$$eval('.m-campanha-contas nav.chips a.chip', l => l.map(a => a.textContent.trim()).join('|') === 'As duas (somadas)|CA01|CA02 · HOF'), 'seletor com as 3 opções');
+  ok((await page.$eval('.m-campanha-contas a.chip[aria-current="true"]', e => e.textContent)).includes('As duas'), 'padrão = as duas somadas');
+  ok((await page.textContent('#view')).includes('Por conta'), 'comparativo por conta na visão somada');
+  const linhasPc = await page.$$eval('.m-campanha-pc tbody tr', l => l.map(tr => Number(tr.children[1].textContent.replace(/[^\d,]/g, '').replace(',', '.'))));
+  const vSoma = await invest();
+  ok(linhasPc.length === 2 && Math.abs(linhasPc[0] + linhasPc[1] - vSoma) <= 2, `investimento somado = CA01 + CA02 (${vSoma})`);
+  await page.click('.m-campanha-contas a.chip:nth-child(2)'); await page.waitForTimeout(350);
+  ok(page.url().includes('conta=ca01'), 'CA01 na URL');
+  const v1 = await invest();
+  ok(Math.abs(v1 - linhasPc[0]) <= 1 && !(await page.textContent('#view')).includes('Por conta'), `CA01 sozinha (${v1})`);
+  await t.ir('#/campanha/campanhas?conta=ca02&dias=30');
+  const nomes2 = await page.textContent('#view');
+  ok(nomes2.includes('[VENDAS]') && !nomes2.includes('[LEAD] Webinar'), 'aba Campanhas filtra pela CA02');
+  ok((await page.$eval('.m-campanha-contas a.chip[aria-current="true"]', e => e.textContent)).includes('CA02'), 'seleção mantida ao trocar de aba');
+  ok(!/1906477940242386|848802707655510/.test(await page.content()), 'demonstração não mostra os IDs reais das contas');
+  await t.ir('#/campanha');
+
   step('aplicar pausa exige SIM (simulado)');
   await t.ir('#/campanha');
   const r1 = await page.$('[data-aplicar^="pausar-anuncio:"]');

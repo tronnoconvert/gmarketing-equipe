@@ -1,6 +1,6 @@
 // shell.js — layout (menu lateral + topo), período, busca global, luz mestra, notificações, perfil, tema e render das rotas.
 import { db } from './store.js';
-import { auth } from './auth.js';
+import { auth, mfa } from './auth.js';
 import { perms, can } from './perms.js';
 import { router } from './router.js';
 import * as fmt from './fmt.js';
@@ -163,6 +163,7 @@ function layoutHtml() {
     <div class="tb-per-m" id="tb-per-m" aria-hidden="true">${segPeriodo()}</div>
   </header>
   <div class="vc" id="vc" hidden></div>
+  <div class="mfa-ban" id="mfa-ban" role="status" hidden></div>
   <main class="view" id="view" tabindex="-1"></main>
 </div></div>
 <nav class="bnav" id="bnav" aria-label="Atalhos"></nav>`;
@@ -194,6 +195,14 @@ function atualizarChrome() {
   if (vc) {
     if (auth.vendoComo()) { const r = auth.real(); vc.hidden = false; vc.innerHTML = `${svgIc('eye')}<span>Vendo como <b>${esc(u.nome)}</b> <span class="vc-p">(${esc(perms.rotuloPapel(u.papel))})</span> · <b class="vc-ro">somente visualização</b></span><span class="vc-sep" aria-hidden="true">·</span><button type="button" class="vc-b" data-voltar>Voltar para ${esc(fmt.primeiro(r.nome))}</button>`; document.documentElement.classList.add('vendo-como'); }
     else { vc.hidden = true; vc.innerHTML = ''; document.documentElement.classList.remove('vendo-como'); }
+  }
+  // Dono/Admin sem verificação em duas etapas: faixa de recomendação (não obrigatória ainda) até ativar
+  const mb = document.getElementById('mfa-ban');
+  if (mb) {
+    const rr = auth.real(); let adiado = false; try { adiado = sessionStorage.getItem('aos-mfa-depois') === '1'; } catch (e) { /* */ }
+    const mostrar = rr && ['dono', 'admin'].includes(rr.papel) && !auth.vendoComo() && mfa.ativo === false && !adiado && !location.hash.startsWith('#/conta');
+    if (mostrar) { mb.hidden = false; mb.innerHTML = `${svgIc('shield')}<span><b>Proteja seu acesso:</b> ative a verificação em duas etapas. Você vê o faturamento — só a senha não basta.</span><a href="#/conta">Ativar agora</a><button type="button" data-mfa-depois>Lembrar depois</button>`; }
+    else { mb.hidden = true; mb.innerHTML = ''; }
   }
   document.querySelectorAll('[data-periodo]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.periodo === periodoAtual)));
   if (sinoPop) {
@@ -499,6 +508,7 @@ function menuPerfil(anc) {
   const html = `<div class="pm-h">${avatar(u, 36)}<div><b>${esc(u.nome)}</b><small>${esc(u.email)}</small><small class="pm-p">${esc(perms.rotuloPapel(u.papel))}</small></div></div>
 <div class="pm-l" role="menu" aria-label="Perfil">
 ${`<a role="menuitem" class="pm-i" href="#/equipe/${esc(u.teamId)}">${svgIc('user')}<span>Meu perfil</span></a>`}
+<a role="menuitem" class="pm-i" href="#/conta">${svgIc('shield')}<span>Minha conta e segurança</span>${mfa.ativo === false && ['dono', 'admin'].includes((r || {}).papel) ? '<span class="pm-n">!</span>' : ''}</a>
 ${auth.vendoComo() ? it('arrow-left', `Voltar para ${r.nome}`, ' data-voltar') : auth.podeVerComo() ? it('eye', 'Ver como…', ' data-ver-como') : ''}
 <a role="menuitem" class="pm-i" href="#/notificacoes">${svgIc('bell')}<span>Notificações e preferências</span>${notify.naoLidas() ? `<span class="pm-n">${notify.naoLidas()}</span>` : ''}</a>
 <div class="pm-sep" role="separator"></div>
@@ -557,6 +567,7 @@ function ligarEventos() {
     if (t.closest('#bell')) { abrirSino(); return; }
     if (t.closest('[data-tema-btn]')) { alternarTema(); return; }
     const pf = t.closest('[data-perfil]'); if (pf) { menuPerfil(pf); return; }
+    if (t.closest('[data-mfa-depois]')) { try { sessionStorage.setItem('aos-mfa-depois', '1'); } catch (e) { /* */ } atualizarChrome(); return; }
     if (t.closest('[data-gs-abrir]')) { focarBusca(); return; }
   });
   // barra inferior (celular): esconde quando o teclado virtual está aberto

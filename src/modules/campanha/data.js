@@ -6,6 +6,13 @@
 import { db } from '../../core/store.js';
 
 export const F_CONVERSA = 'actions_onsite_conversion_messaging_conversation_started_7d';
+// duas contas FICTÍCIAS na demonstração (em produção: CA01 e CA02 · HOF reais, em engine.js)
+export const CONTAS_DEMO = [
+  { k: 'ca01', id: 'act_1000000001', nome: 'CA01 · Conta demonstração', curto: 'CA01' },
+  { k: 'ca02', id: 'act_1000000002', nome: 'CA02 · HOF (demonstração)', curto: 'CA02 · HOF' },
+];
+export const CONTA_DE = { 'cp-lead-web': 'ca01', 'cp-msg-diag': 'ca01', 'cp-lead-isca': 'ca01', 'cp-rmk-pv': 'ca02', 'cp-vendas-escala': 'ca02', 'cp-engaj': 'ca02' };
+const ACT_DE = k => (CONTAS_DEMO.find(c => c.k === k) || CONTAS_DEMO[0]).id;
 export const CAMPO_RESULTADO = { lead: 'actions_lead', conversa: F_CONVERSA, compra: 'actions_purchase', engaj: 'actions_post_engagement' };
 
 // gerador pseudoaleatório determinístico (mesmos dados em todo navegador)
@@ -82,12 +89,13 @@ const CAMPAIGNS = [], CREATIVES = [], DAILY = [];
 const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
 const DIAS = 90;
 ESTRUTURA.forEach(([cid, cnome, tipo, cst, conjuntos]) => {
-  CAMPAIGNS.push({ id: cid, nivel: 'campanha', nome: cnome, tipo, status: cst, campanhaId: cid });
+  const ct = CONTA_DE[cid];
+  CAMPAIGNS.push({ id: cid, nivel: 'campanha', nome: cnome, tipo, status: cst, campanhaId: cid, conta: ct });
   conjuntos.forEach(([sid, snome, orc, sst, ads]) => {
-    CAMPAIGNS.push({ id: sid, nivel: 'conjunto', nome: snome, paiId: cid, campanhaId: cid, tipo, status: sst, orcamentoDia: orc, ...(APRENDIZADO[sid] ? { aprendizado: APRENDIZADO[sid] } : {}) });
+    CAMPAIGNS.push({ id: sid, nivel: 'conjunto', nome: snome, paiId: cid, campanhaId: cid, conta: ct, tipo, status: sst, orcamentoDia: orc, ...(APRENDIZADO[sid] ? { aprendizado: APRENDIZADO[sid] } : {}) });
     const peso = ads.map((a, i) => 1 + (ads.length - i) * 0.15);
     ads.forEach(([aid, anome, formato, cpm, ctr, conv, hook, inicio, fadiga, cores, titulo, texto, cta], k) => {
-      CAMPAIGNS.push({ id: aid, nivel: 'anuncio', nome: anome, paiId: sid, campanhaId: cid, tipo, status: sst === 'pausado' ? 'pausado' : 'ativo', criativoId: `cr-${aid}` });
+      CAMPAIGNS.push({ id: aid, nivel: 'anuncio', nome: anome, paiId: sid, campanhaId: cid, conta: ct, tipo, status: sst === 'pausado' ? 'pausado' : 'ativo', criativoId: `cr-${aid}` });
       CREATIVES.push({ id: `cr-${aid}`, anuncioId: aid, nome: anome, formato, cores, titulo, texto, cta });
       for (let d = DIAS; d >= 1; d--) {
         const idade = inicio - d; if (idade < 0) continue; // ainda não existia
@@ -104,7 +112,7 @@ ESTRUTURA.forEach(([cid, cnome, tipo, cst, conjuntos]) => {
         const impressions = Math.round((spend / (cpm * cpmF * (1 + (frequency - 1.1) * 0.06))) * 1000 * ruido(0.06));
         const ctrD = Math.max(0.2, ctr * (1 - Math.max(0, frequency - 1.6) * 0.11) * ruido(0.1) * (tend > 1 ? 1.06 : 1)) * (ch ? ch.ctr : 1) / 100;
         const clicks = Math.round(impressions * ctrD);
-        const row = { id: `cd-${aid}-${d}`, date: iso(dt), campaign_id: cid, adset_id: sid, ad_id: aid, spend, impressions, clicks, reach: Math.round(impressions / frequency), frequency };
+        const row = { id: `cd-${aid}-${d}`, conta: ct, account_id: ACT_DE(ct), date: iso(dt), campaign_id: cid, adset_id: sid, ad_id: aid, spend, impressions, clicks, reach: Math.round(impressions / frequency), frequency };
         const convD = conv * tend * (1 - Math.max(0, frequency - 2.2) * 0.12) * ruido(0.18);
         if (tipo === 'engaj') row.actions_post_engagement = Math.round(impressions * (conv / 100) * ruido(0.15));
         else if (tipo === 'lead') row.actions_lead = pois(clicks * convD);

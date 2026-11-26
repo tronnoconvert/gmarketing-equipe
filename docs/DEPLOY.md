@@ -339,3 +339,42 @@ Para desligar: `select cron.unschedule('aos-voo-dados');`.
 ### 8.5 Teste real
 `SQL_CMD=/caminho/q.sh node tests/live/voo.mjs` cria 2 logins e 1 cliente de teste, confere escopo, receita, busca ao vivo, regras das
 ações e o limite por hora, e apaga tudo no final; com `OUT=<build de produção>` e `SUPABASE_ESM_FILE` também abre a tela com o gestor de teste (25/11/2026: 30/30).
+
+### 8.6 Publicar uma Edge Function sem a CLI (Management API)
+Nas sessões do Claude Code (sem `supabase` instalado) a função é publicada direto pela API, com os arquivos de `_shared` que ela importa:
+```bash
+curl -X POST "https://api.supabase.com/v1/projects/hzonfbqsjxiwfmjywdlw/functions/deploy?slug=windsor-proxy" \
+  -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+  --form-string 'metadata={"entrypoint_path":"supabase/functions/windsor-proxy/index.ts","name":"windsor-proxy","verify_jwt":true}' \
+  -F "file=@supabase/functions/windsor-proxy/index.ts;filename=supabase/functions/windsor-proxy/index.ts" \
+  -F "file=@supabase/functions/_shared/http.ts;filename=supabase/functions/_shared/http.ts" \
+  -F "file=@supabase/functions/_shared/supa.ts;filename=supabase/functions/_shared/supa.ts"
+```
+
+## 9. Campanha — contas próprias do dono (CA01 e CA02 · HOF)
+Tela **Tráfego › Campanha** (`#/campanha`), só **Dono e Admin**. Seletor no topo: **As duas (somadas)** (padrão) · **CA01** · **CA02 · HOF**,
+gravado na URL (`?conta=ca01|ca02`; sem o parâmetro = somadas). Na visão somada aparece o card **Por conta** (parte de cada uma).
+- **Produção**: dados AO VIVO da Edge Function `windsor-proxy` (Dono/Admin, conferido no servidor), contas `act_1906477940242386`
+  (CA01 - Gabriel Leão) e `act_848802707655510` (CA02 · HOF): últimos 180 dias + hoje, por anúncio e dia, guardados só na memória do
+  navegador (nada é gravado no banco); atualiza ao abrir e a cada 5 min. Se a última veiculação for antiga, a tela avisa
+  "Sem veiculação desde …" (26/11/2026: CA01 com último gasto em 03/07/2026; CA02 · HOF sem gasto registrado na Windsor).
+  Pausar/orçamento das contas próprias ainda não estão ligados por aqui (o botão explica); as decisões recomendadas são registradas.
+  As quebras (posicionamento, idade…) por enquanto só existem na demonstração.
+- **Demonstração**: duas contas fictícias (`act_1000000001` e `act_1000000002`), dados simulados. A produção nunca usa esses dados.
+- `windsor-proxy`: a Windsor só aceita presets `last_Xd`/`last_XdT`; `today`, `yesterday`, `this_month`, `last_month` e `this_year`
+  viram `date_from`/`date_to` (dia de São Paulo) no servidor. `select_accounts` aceita até 10 IDs (`act_…` ou só números) separados
+  por vírgula; sem ele, usa `WINDSOR_ACCOUNT_ID` ou as duas contas próprias.
+- Teste real: `NODE_USE_ENV_PROXY=1 node tests/live/campanha.mjs` (cria dono e gestor temporários, confere as duas contas, os presets,
+  a recusa do gestor e apaga tudo — 26/11/2026: 13/13).
+
+## 10. Verificação em duas etapas (2FA)
+- Supabase › Authentication › MFA: **TOTP ligado** (aplicativo autenticador). No app: menu do perfil › **Minha conta e segurança**
+  (`#/conta`) › **Ativar verificação em duas etapas** › escanear o QR › digitar o código. Lista e remove o aplicativo ali mesmo.
+- Login: quem tem um aplicativo verificado digita o **código de 6 dígitos** depois da senha; nada é carregado antes do código (aal2).
+  Uma sessão que parou na senha (aal1 com fator) é encerrada ao reabrir o app.
+- **Não é obrigatória ainda** (decisão para não trancar os donos fora): Dono e Admin sem 2FA veem uma faixa laranja
+  "Proteja seu acesso" em todas as telas ("Lembrar depois" esconde só nesta sessão). Quando os dois tiverem ativado, dá para tornar
+  obrigatório exigindo `aal2` nas políticas.
+- As funções do banco (receita, `ler_records`, `gravar_record`…) **não mudaram**: continuam valendo para a sessão aal1 e aal2.
+- Perdeu o celular: no Supabase › Authentication › Users › (pessoa) › remover o fator MFA; ela entra só com a senha e ativa de novo.
+- Demonstração: tudo simulado (QR fictício, código `123456`).

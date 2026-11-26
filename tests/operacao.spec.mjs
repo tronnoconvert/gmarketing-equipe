@@ -68,8 +68,9 @@ export default async function (t) {
   if (!t.mobile) {
     step('arrastar e soltar');
     await t.ir('#/operacao/quadro');
-    const c = await page.$('.kb-card[data-id="tk-15"] .kb-tit'); const bb = await c.boundingBox();
-    const col = await (await page.$('.kb-col[data-col="andamento"] .kb-ch')).boundingBox();
+    const c = await page.$('.kb-card[data-id="tk-15"] .kb-tit'); await c.scrollIntoViewIfNeeded(); const bb = await c.boundingBox(); // a coluna pode passar da altura da tela
+    const colBox = await (await page.$('.kb-col[data-col="andamento"]')).boundingBox();
+    const col = { x: colBox.x, y: Math.max(colBox.y, Math.min(bb.y, colBox.y + colBox.height - 80)) - 40 + 20 };
     await page.mouse.move(bb.x + 20, bb.y + 5); await page.mouse.down();
     await page.mouse.move(bb.x + 60, bb.y + 30, { steps: 4 }); await page.mouse.move(col.x + 40, col.y + 40, { steps: 8 });
     ok(await page.isVisible('.kb-ghost'), 'cartão fantasma durante o arraste');
