@@ -822,3 +822,7 @@ create trigger records_backup_status_guard before insert or update or delete on 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values ('backups', 'backups', false, 524288000, array['application/gzip', 'application/json'])
 on conflict (id) do update set public = false;
+
+-- Funções de gatilho não precisam (nem devem) ser executáveis por anon/authenticated (achado da auditoria de 25/11/2026).
+-- O gatilho continua funcionando: quem dispara é a tabela, não a permissão EXECUTE de quem grava.
+revoke execute on function public.tg_records_guard(), public.tg_users_sync_profile() from public, anon, authenticated;

@@ -25,3 +25,10 @@
     X-Frame-Options = "SAMEORIGIN"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()"
+    Cross-Origin-Opener-Policy = "same-origin"
+    # CSP: só o próprio site, o Supabase do projeto (https + wss do realtime), o supabase-js do cdn.jsdelivr.net e o Google Fonts.
+    # O hash é o do <script> inline de src/index.html (tema + AOS_CONFIG): se ele mudar, troque o hash
+    # (tests/csp.spec.mjs falha e mostra o valor novo).
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'sha256-v85cqOH1nqV46lUPsJIUCtV8yynFlX2fdMZm6rU/ZGA=' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https://hzonfbqsjxiwfmjywdlw.supabase.co; connect-src 'self' https://hzonfbqsjxiwfmjywdlw.supabase.co wss://hzonfbqsjxiwfmjywdlw.supabase.co https://cdn.jsdelivr.net; media-src 'self' data: blob:; worker-src 'self' blob:; frame-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'; upgrade-insecure-requests"
