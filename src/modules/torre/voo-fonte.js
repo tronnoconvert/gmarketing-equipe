@@ -1,6 +1,6 @@
 // voo-fonte.js — Painel de Voo: de onde vêm os dados e como as ações vão para o Meta.
 //  - Produção (db.mode 'supabase'): Edge Function voo-dados (visão geral pelo cache do servidor, no máximo 5 min; detalhe do
-//    cliente AO VIVO, sem cache) e voo-acao (pausar / orçamento, com SIM, 10 mudanças por conjunto por hora e auditoria no servidor).
+//    cliente AO VIVO, sem cache) e voo-acao (pausar / orçamento, com SIM obrigatório, sem limite por hora, auditoria no servidor).
 //  - Demonstração (testes, Protótipo Oficial): dados fictícios de voo-demo.js, com as mesmas regras simuladas aqui
 //    (escopo, receita, limite por hora, atraso do Meta/Windsor para confirmar a ação).
 // Frescor (regra do dono): o detalhe do cliente sempre busca ao vivo ao abrir, atualiza a cada 2 min com a aba visível,
@@ -9,7 +9,6 @@
 import { db } from '../../core/store.js';
 import { auth } from '../../core/auth.js';
 import { perms } from '../../core/perms.js';
-import { padrao } from '../../core/padroes/index.js';
 import { gerarDemo } from './voo-demo.js';
 
 export const AUTO_MS = 120000;      // detalhe aberto: busca ao vivo a cada 2 min (aba visível)
@@ -142,7 +141,6 @@ export function mudancasNaHora(objId, pac) {
   const l = ((pac && pac.mudancasHora) || (est.geral && est.geral.mudancasHora) || {})[objId] || [];
   return l.map(t => Date.parse(t)).filter(t => Date.now() - t < 36e5).sort();
 }
-export const limiteHora = () => Math.min(10, Math.max(1, Number(padrao('orcamento.maxMudancasHora', 10)) || 10));
 
 /**
  * envia a ação (já confirmada com SIM na tela). a = {acao:'pausar'|'orcamento', nivel, id, conta, valor?, via?}
@@ -156,7 +154,6 @@ export async function executarAcao(a) {
     if (!acoesConfiguradas()) { const e = new Error('Ações no Meta aguardando o token do usuário do sistema — peça ao administrador.'); e.codigo = 'nao_configurado'; throw e; }
     if (a.acao === 'orcamento') {
       const l = (demoEst.mudancas[a.id] || []).filter(t => Date.now() - t < 36e5);
-      if (l.length >= limiteHora()) { const lib = new Date(Math.min(...l) + 36e5); const e = new Error(`Limite atingido: no máximo ${limiteHora()} mudanças de orçamento por conjunto por hora. Próxima liberação às ${String(lib.getHours()).padStart(2, '0')}:${String(lib.getMinutes()).padStart(2, '0')}.`); e.codigo = 'limite_hora'; throw e; }
       demoEst.mudancas[a.id] = [...l, Date.now()];
     }
     demoEst.mut[a.id] = { ...(demoEst.mut[a.id] || {}), ...(a.acao === 'pausar' ? { st: 'PAUSED' } : { orc: a.valor }), visivelEm: Date.now() + atrasoDemo() };

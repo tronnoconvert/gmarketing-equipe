@@ -319,8 +319,12 @@ Passo a passo (feito uma vez pelo dono, no computador, logado no Facebook que ad
    (digite **SIM**).
 
 Regras que valem no servidor (`voo-acao`), não só na tela: **SIM** obrigatório em toda alteração; só **pausar** e **orçamento diário**
-(reativar, arquivar e excluir não existem pelo painel; "Criar ou subir campanha: somente pelo Gerenciador, via 4G."); no máximo
-**10 mudanças de orçamento por conjunto (ou campanha CBO) por hora** (decisão do dono, 25/11/2026; era 4) (tabela `voo_mudancas`, função `voo_reservar_mudanca`);
+(reativar, arquivar e excluir não existem pelo painel; "Criar ou subir campanha: somente pelo Gerenciador, via 4G."); **sem limite
+de alterações por hora** (decisão do dono, 25/11/2026 — antes eram 4; cada mudança continua registrada em `voo_mudancas` via `voo_reservar_mudanca`,
+chamada com `p_limite = null`); **auditoria de autoria**: `activity` e `clientActions` gravam `autorId/autorNome`, `respId/respNome` (responsável
+do cliente) e `deOutroGestor: true` quando quem mexeu não é o responsável; nesse caso o responsável e Dono/Admin recebem notificação
+("Ana alterou Cliente X — cliente de Bruno"), o histórico do cliente mostra a marca e Equipe › Atividade / Administração › Auditoria
+têm o filtro "Alterações em clientes de outro gestor";
 só contas do escopo da pessoa e o item precisa ser da conta (conferido no Meta); "ver como" recusado; conta em quarentena do Guardião
 recusada; tudo registrado em Administração › Auditoria e em Clientes › Resultados e ações. A única alteração sem SIM continua sendo a
 pausa automática do Guardião (invasão).

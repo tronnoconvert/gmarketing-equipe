@@ -777,8 +777,9 @@ alter table public.voo_mudancas enable row level security;
 revoke all on public.voo_cache, public.voo_mudancas from anon, authenticated;
 grant select, insert, update, delete on public.voo_cache, public.voo_mudancas to service_role;
 
--- reserva atômica de uma mudança de orçamento: no máximo p_limite por objeto na última hora (regra do dono: 10/conjunto/hora).
--- Devolve o id da reserva ou -1 se o limite foi atingido. A função voo-acao marca ok=false se o Meta recusar.
+-- registro atômico de uma mudança de orçamento (histórico). Decisão do dono (25/11/2026): SEM limite por hora — a voo-acao
+-- passa p_limite = null e nada é recusado. p_limite > 0 (opcional) ainda limita por objeto na última hora; -1 = limite atingido.
+-- A função voo-acao marca ok=false se o Meta recusar.
 create or replace function public.voo_reservar_mudanca(p_org text, p_objeto text, p_conta text, p_user uuid, p_antes numeric, p_depois numeric, p_limite int)
 returns bigint language plpgsql security definer set search_path = public as $$
 declare n int; v_id bigint;
@@ -786,7 +787,7 @@ begin
   perform pg_advisory_xact_lock(hashtext('voo:' || p_objeto));
   select count(*) into n from public.voo_mudancas
    where objeto_id = p_objeto and tipo = 'orcamento' and ok and quando > now() - interval '1 hour';
-  if n >= greatest(1, least(coalesce(p_limite, 10), 10)) then return -1; end if;
+  if p_limite is not null and p_limite > 0 and n >= p_limite then return -1; end if;
   insert into public.voo_mudancas (org_id, objeto_id, conta_id, tipo, user_id, antes, depois)
   values (p_org, p_objeto, p_conta, 'orcamento', p_user, p_antes, p_depois) returning id into v_id;
   return v_id;

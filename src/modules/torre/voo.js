@@ -3,7 +3,7 @@
 //   #/torre/voo                → visão geral: semáforo por cliente, fila "Comece por aqui", contas sem cliente vinculado
 //   #/torre/voo/:conta?aba=    → detalhe do cliente (sempre AO VIVO): KPIs, "por quê", investimento × teto, recomendações do
 //                                motor único, campanhas › conjuntos › anúncios (pausar e orçamento com SIM), histórico
-// Regras do dono: SIM em toda alteração; máx. 10 mudanças de orçamento por conjunto/hora (também no servidor); só pausar (nunca
+// Regras do dono: SIM em toda alteração; sem limite de mudanças de orçamento por hora (decisão de 25/11/2026), toda mudança auditada; só pausar (nunca
 // excluir); sem links para o Gerenciador ("Criar ou subir campanha: somente pelo Gerenciador, via 4G."); "Ver como" = só ver;
 // receita só para Dono/Admin (o servidor já tira). A única alteração sem SIM é a pausa automática do Guardião (invasão).
 import { db } from '../../core/store.js';
@@ -269,9 +269,8 @@ function metr(x, c) {
 }
 function abaCampanhas(ctx, c, bq) {
   const dis = bq ? { disabled: true, title: bq } : {};
-  const mud = id => F.mudancasNaHora(id, F.pacoteDaConta(c.id)).length;
   const bPausar = (x, nivel) => (ATIVO(x.st) && !(x.pendente && x.pendente.st) ? ui.btn({ rotulo: 'Pausar', icone: 'pause', sm: true, cls: 'm-voo-bp', attrs: { 'data-voo-pausar': x.id, 'data-nivel': nivel, 'aria-label': `Pausar ${NIVEL_ROT[nivel]} ${x.n}` }, ...dis }) : '');
-  const bOrc = (x, nivel) => (x.orc != null && ATIVO(x.st) ? ui.btn({ rotulo: `Orçamento ${fmt.brl2(x.orc)}/dia`, icone: 'wallet', sm: true, attrs: { 'data-voo-orc': x.id, 'data-nivel': nivel, 'aria-label': `Mudar orçamento de ${x.n}` }, ...dis }) + (mud(x.id) ? `<span class="m-voo-lim num" title="Mudanças de orçamento nesta hora">${mud(x.id)}/${F.limiteHora()} nesta hora</span>` : '') : '');
+  const bOrc = (x, nivel) => (x.orc != null && ATIVO(x.st) ? ui.btn({ rotulo: `Orçamento ${fmt.brl2(x.orc)}/dia`, icone: 'wallet', sm: true, attrs: { 'data-voo-orc': x.id, 'data-nivel': nivel, 'aria-label': `Mudar orçamento de ${x.n}` }, ...dis }) : '');
   const aberto = (id, padrao) => (abertos.has(id) ? abertos.get(id) : padrao) ? ' open' : '';
   const arvore = c.camps.map(cp => `<details class="m-voo-nd lv-c${ATIVO(cp.st) ? '' : ' off'}" data-nd="${fmt.esc(cp.id)}"${aberto(cp.id, ATIVO(cp.st))}>
 <summary><span class="m-voo-lv">${ui.ic('layers')}Campanha</span><div class="m-voo-nt"><b>${fmt.esc(cp.n)}</b><small>${fmt.esc(objetivo(cp.obj))} · ${cp.cbo ? `CBO · ${fmt.brl2(cp.orc)}/dia na campanha` : 'ABO · orçamento nos conjuntos'}</small></div>${stHtml(cp)}${metr(cp, c)}</summary>
@@ -281,7 +280,7 @@ function abaCampanhas(ctx, c, bq) {
 <div class="m-voo-na">${bPausar(s, 'conjunto')}${!cp.cbo ? bOrc(s, 'conjunto') : ''}</div>
 <ul class="m-voo-ads">${s.ads.map(a => `<li class="m-voo-ad${ATIVO(a.st) ? '' : ' off'}"><span class="m-voo-lv">${ui.ic('eye')}Anúncio</span><div class="m-voo-nt"><b>${fmt.esc(a.n)}</b><small>freq. 7d ${a.m.d7.freq ? fmt.dec(a.m.d7.freq, 1) : '—'}</small></div>${stHtml(a)}${metr(a, c)}<div class="m-voo-na">${bPausar(a, 'anuncio')}${ui.btn({ rotulo: 'Pedir criativo novo', icone: 'users', sm: true, tipo: 'ghost', attrs: { 'data-voo-criativo': a.id }, disabled: auth.vendoComo() || !ctx.can('torre_voo', 'editar') })}</div></li>`).join('')}</ul>
 </details>`).join('')}</div></details>`).join('');
-  return `${ui.card({ titulo: 'Campanhas, conjuntos e anúncios', sub: `${c.camps.length} campanha(s) com veiculação nos últimos 14 dias`, ajuda: 'Cada botão age só no nível da caixa em que está. Pausar e mudar orçamento pedem SIM. Máximo de 10 mudanças de orçamento por conjunto (ou campanha CBO) por hora. Reativar e excluir não são feitos por aqui.',
+  return `${ui.card({ titulo: 'Campanhas, conjuntos e anúncios', sub: `${c.camps.length} campanha(s) com veiculação nos últimos 14 dias`, ajuda: 'Cada botão age só no nível da caixa em que está. Pausar e mudar orçamento pedem SIM. Sem limite de mudanças por hora: cada mudança fica no histórico do cliente com quem fez. Reativar e excluir não são feitos por aqui.',
     corpo: `<p class="m-voo-4g">${ui.ic('lock')}<span><b>${AVISO_4G}</b> Aqui você pausa e ajusta o orçamento do que já existe. Toda alteração pede SIM.</span></p><div class="m-voo-inv">${ui.ic('wallet')}<p><b>${fmt.esc(fraseInvestimento(c).texto)}</b> <span>${fmt.esc(fraseInvestimento(c).textoTeto)}</span></p></div>${arvore || ui.vazio({ titulo: 'Nenhuma campanha com veiculação', texto: 'Nos últimos 14 dias esta conta não teve gasto.', compacto: true })}` })}`;
 }
 const objetivo = o => ({ OUTCOME_ENGAGEMENT: 'Engajamento / mensagens', OUTCOME_LEADS: 'Cadastros', OUTCOME_SALES: 'Vendas', OUTCOME_TRAFFIC: 'Tráfego', OUTCOME_AWARENESS: 'Reconhecimento', MESSAGES: 'Mensagens' }[o] || o || 'Objetivo não informado');
@@ -389,12 +388,11 @@ async function pausar(ctx, c, id, via) {
 async function orcamento(ctx, c, id, sugerido, via) {
   const b = bloqueio(ctx, c); if (b) { ui.toast(b, { tipo: 'info' }); return false; }
   const it = acharItem(c, id); if (!it || it.x.orc == null) return false;
-  const atual = it.x.orc; const LIM = F.limiteHora(); const usados = F.mudancasNaHora(id, F.pacoteDaConta(c.id));
-  if (usados.length >= LIM) { const lib = new Date(usados[0] + 36e5); ui.toast(`Limite de alterações: no máximo ${LIM} mudanças de orçamento por conjunto por hora. Este já teve ${usados.length}. Próxima liberação às ${fmt.hora(lib)}.`, { tipo: 'warn', duracao: 7000 }); return false; }
+  const atual = it.x.orc;
   const minimo = Math.max(6, Number(padrao('orcamento.minimoDia', 6)) || 6); const maxPct = Number(padrao('orcamento.aumentoMaxPct', 20)) || 20;
   const nivelTxt = it.nivel === 'conjunto' ? `conjunto "${it.x.n}" (ABO: cada conjunto tem o próprio orçamento)` : `campanha "${it.x.n}" (CBO: o Meta distribui entre os conjuntos)`;
   let valor = null;
-  const corpo = `<div class="stack m-voo-orc"><p class="sm mut">Aplica no nível certo: ${fmt.esc(nivelTxt)}. Mudanças nesta hora: <b class="num">${usados.length}/${LIM}</b>.</p>
+  const corpo = `<div class="stack m-voo-orc"><p class="sm mut">Aplica no nível certo: ${fmt.esc(nivelTxt)}.</p>
 <div class="row m-voo-q">${[-20, -10, 10, 20].map(p => `<button type="button" class="chip" data-q="${p}">${p > 0 ? '+' : '−'}${Math.abs(p)}%</button>`).join('')}</div>
 ${ui.campo({ nome: 'valor', rotulo: `Novo orçamento diário · atual ${fmt.brl2(atual)}`, tipo: 'moeda', valor: sugerido ?? atual, obrigatorio: true })}
 <p class="sm" data-o-p aria-live="polite"></p><div data-o-w></div></div>`;
@@ -430,12 +428,24 @@ ${ui.campo({ nome: 'valor', rotulo: `Novo orçamento diário · atual ${fmt.brl2
   return true;
 }
 /** demonstração: o histórico é gravado aqui (em produção quem grava é a Edge Function voo-acao) */
+/** auditoria de toda alteração (decisão do dono, 25/11/2026): quem mudou, qual cliente, quem é o responsável e se o cliente é de outra pessoa */
+export function auditoriaVoo(c, eu = quemSou()) {
+  const resp = c && c.cliente && c.cliente.respId ? db.get('team', c.cliente.respId) : null;
+  return { autorId: eu.userId, autorNome: eu.nome, autorTeamId: eu.teamId, respId: resp ? resp.id : null, respNome: resp ? resp.nome : null, deOutroGestor: !!(resp && resp.id !== eu.teamId) };
+}
 function registrarLocal(c, a) {
-  if (db.mode === 'supabase') return;
-  const eu = quemSou(); const agora = new Date().toISOString();
-  const oque = `${a.descricao.replace(/\.$/, '').replace(/^\w/, x => x.toLowerCase())} (${nomeCliente(c)})`;
-  if (c.cliente) db.insert('clientActions', { clientId: c.cliente.id, data: agora.slice(0, 10), quem: eu.teamId, area: 'trafego', metrica: a.metrica || null, expectativa: '', resultado: '', origem: 'torre', contaMeta: c.id, ...a }, { log: oque });
-  else db.insert('activity', { quem: eu.userId, quemNome: eu.nome, oque, col: 'torre', refId: null, quando: agora });
+  if (db.mode === 'supabase') return; // em produção a Edge Function voo-acao grava auditoria, histórico e notificações
+  const eu = quemSou(); const agora = new Date().toISOString(); const aud = auditoriaVoo(c, eu);
+  const oque = `${a.descricao.replace(/\.$/, '').replace(/^\w/, x => x.toLowerCase())} (${nomeCliente(c)}${aud.deOutroGestor ? ` — cliente de ${aud.respNome}` : ''})`;
+  if (!c.cliente) { db.insert('activity', { quem: eu.userId, quemNome: eu.nome, oque, col: 'torre', refId: null, quando: agora, ...aud }); return; }
+  const ca = db.insert('clientActions', { clientId: c.cliente.id, data: agora.slice(0, 10), quem: eu.teamId, area: 'trafego', metrica: a.metrica || null, expectativa: '', resultado: '', origem: 'torre', contaMeta: c.id, ...a, ...aud });
+  db.insert('activity', { quem: eu.userId, quemNome: eu.nome, oque, col: 'clientActions', refId: ca && ca.id, clientId: c.cliente.id, quando: agora, ...aud });
+  if (aud.deOutroGestor) {
+    const respUser = (db.get('team', aud.respId) || {}).userId;
+    const para = [...new Set([respUser, ...db.list('users', u => u.ativo !== false && ['dono', 'admin'].includes(u.papel)).map(u => u.id)])].filter(id => id && id !== eu.userId);
+    if (para.length) notify.enviar({ para, de: eu.userId, tipo: 'alerta', prioridade: 'alta', canais: ['app'], refCol: 'clients', refId: c.cliente.id, link: `#/clientes/${c.cliente.id}/resultados-acoes`,
+      titulo: `${eu.nome} alterou ${nomeCliente(c)} — cliente de ${aud.respNome}`, texto: `${a.descricao} Antes: ${a.antes || '—'} · depois: ${a.depois || '—'}.` });
+  }
 }
 
 /* ------------------------------------------------------------------ recomendações: decisões */

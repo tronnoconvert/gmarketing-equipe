@@ -7,14 +7,17 @@
 - (25/11/2026) **Gestores de tráfego veem e operam TODOS os clientes** (Clientes e Painel de Voo, inclusive Pausar/Orçamento com SIM),
   para cobrir colega ausente. Abrem no filtro "Meus" (alternância "Meus / Todos"). Receita continua invisível para eles (cortada no servidor).
   Contas sem cliente vinculado: só Dono/Admin/Head. CS e produção seguem só com os seus clientes.
-- (25/11/2026) **Máximo de 10 mudanças de orçamento por conjunto (ou campanha CBO) por hora** (era 4), garantido no banco.
+- (25/11/2026) **Sem limite de alterações de orçamento por hora** (o limite de 4 caiu). SIM continua obrigatório em toda alteração.
+- (25/11/2026) **Toda alteração é auditável: quem mudou qual cliente.** Se o cliente é de outro gestor, fica marcado (`deOutroGestor`) no
+  histórico do cliente ("Ana alterou a verba — cliente de Bruno"), em Equipe › Atividade e em Administração › Auditoria (filtro
+  "Alterações em clientes de outro gestor"), e o responsável do cliente + Dono/Admin recebem notificação.
 
 ## Depois de hospedar (prioridade 1 — NÃO ESQUECER)
 - ✅ (25/11) **Item 17 · Painel de Voo nativo com dados reais** (`#/torre/voo`, `#/torre/voo/<conta>`). Iframe e `public/torre/`
   removidos (fontes do protótipo continuam em `torre-prototipo/`). Detalhes: `docs/DEPLOY.md` §8.
   - Dados reais via Windsor (Edge Function `voo-dados`, cache no servidor ≤ 5 min; detalhe do cliente sempre **ao vivo**, com
     atualização a cada 2 min, "Atualizar agora" e nova busca depois de cada ação). Receita removida no servidor para quem não é Dono/Admin.
-  - Ações (`voo-acao`, Graph API do Meta): pausar campanha/conjunto/anúncio e orçamento diário, SIM obrigatório, 10 mudanças/conjunto/hora
+  - Ações (`voo-acao`, Graph API do Meta): pausar campanha/conjunto/anúncio e orçamento diário, SIM obrigatório, sem limite por hora, autoria auditada
     no banco, só pausar (nunca reativar/excluir), "ver como" recusado, auditoria em `activity` + `clientActions`.
   - Vínculo cliente ↔ conta: `clients.metaContas` (Clientes › Cadastro › Metas, ou "Contas sem cliente vinculado" no painel; Dono/Admin/Head)
     e meta de custo por conversa (`clients.metaCustoConversa`) para o semáforo; teto `tetoDiarioCliente(c)`.

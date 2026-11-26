@@ -7,12 +7,13 @@
 // Regras do dono (valem aqui, não só na tela):
 //  - toda alteração exige confirmacao === 'SIM' (sem "não perguntar de novo");
 //  - só PAUSAR (nunca reativar, arquivar nem excluir) e mudar orçamento diário;
-//  - no máximo 4 mudanças de orçamento por conjunto (ou campanha CBO) por hora — reserva atômica no banco;
+//  - SEM limite de mudanças por hora (decisão do dono, 25/11/2026): cada mudança é registrada (voo_mudancas) e auditada com autor,
+//    cliente, responsável e a marca deOutroGestor; o responsável (e Dono/Admin) recebe notificação quando outra pessoa mexe no cliente;
 //  - só quem EDITA o Painel de Voo e só em contas do seu escopo; o objeto precisa ser da conta informada (conferido no Meta);
 //  - "Ver como" não chega aqui: o JWT é sempre da pessoa real e o app não envia ações em "ver como"; se vier a marca, recusa.
 // Sem META_ACCESS_TOKEN: 503 "não configurado". Toda alteração fica em activity e no histórico do cliente (clientActions).
-import { corpo, env, HttpError, json, servir, texto } from '../_shared/http.ts';
-import { adminClient, auditar, chamador, gravar, novoId, obter } from '../_shared/supa.ts';
+import { corpo, HttpError, json, servir, texto } from '../_shared/http.ts';
+import { adminClient, chamador, gravar, listar, novoId, obter } from '../_shared/supa.ts';
 import { graph, listaDias, mapaContas, normConta, podeConta, quemVoo, tokenMeta, lerCache, gravarCache, type Dia } from '../_shared/voo.ts';
 
 const NIVEIS = ['campanha', 'conjunto', 'anuncio'];
@@ -60,28 +61,38 @@ Deno.serve(servir(async (req) => {
     const valor = Number(b.valor);
     const pad = (await obter(q.org, 'settings', 'padroes'))?.valor as Record<string, unknown> | undefined;
     const minimo = Math.max(6, Number(pad?.['orcamento.minimoDia']) || 6);
-    const limite = Math.min(10, Math.max(1, Number(pad?.['orcamento.maxMudancasHora']) || 10));
     if (!isFinite(valor) || valor < minimo || valor > 100000) throw new HttpError(400, `Orçamento diário inválido: mínimo ${brl(minimo)}, máximo ${brl(100000)}.`, 'validacao');
     if (atual.daily_budget == null) throw new HttpError(400, `Este item não tem orçamento diário próprio (${nivel === 'conjunto' ? 'a campanha é CBO: mude na campanha' : 'a campanha é ABO: mude nos conjuntos'}).`, 'validacao');
     const ant = Number(atual.daily_budget) / 100;
     if (Math.abs(ant - valor) < 0.005) throw new HttpError(400, 'O valor é igual ao atual.', 'validacao');
-    const { data: reserva, error } = await adminClient().rpc('voo_reservar_mudanca', { p_org: q.org, p_objeto: id, p_conta: conta, p_user: c.userId, p_antes: ant, p_depois: valor, p_limite: limite });
+    // sem limite de mudanças por hora (decisão do dono, 25/11/2026): a reserva só registra a mudança no histórico (voo_mudancas)
+    const { data: reserva, error } = await adminClient().rpc('voo_reservar_mudanca', { p_org: q.org, p_objeto: id, p_conta: conta, p_user: c.userId, p_antes: ant, p_depois: valor, p_limite: null });
     if (error) throw error;
-    if (Number(reserva) < 0) {
-      const { data: l } = await adminClient().from('voo_mudancas').select('quando').eq('objeto_id', id).eq('tipo', 'orcamento').eq('ok', true).gt('quando', new Date(Date.now() - 36e5).toISOString()).order('quando').limit(1);
-      const lib = l && l[0] ? new Date(Date.parse(l[0].quando as string) + 36e5) : new Date(Date.now() + 36e5);
-      throw new HttpError(429, `Limite atingido: no máximo ${limite} mudanças de orçamento por conjunto por hora. Próxima liberação às ${lib.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: env('TZ_AGENCIA') ?? 'America/Sao_Paulo' })}.`, 'limite_hora');
-    }
     try { await graph(id, { metodo: 'POST', params: { daily_budget: String(Math.round(valor * 100)) } }); }
     catch (e) { await adminClient().from('voo_mudancas').update({ ok: false }).eq('id', reserva); throw e; }
     antes = `${brl(ant)}/dia`; depois = `${brl(valor)}/dia`; resultado = { orc: valor, antes: ant };
   }
 
   // auditoria + histórico do cliente
-  const oque = acao === 'pausar' ? `pausou ${ROT[nivel]} "${nome}" no Meta (Painel de Voo)` : `mudou o orçamento diário de ${ROT[nivel]} "${nome}" de ${antes} para ${depois} (Painel de Voo)`;
-  await auditar(q.org, { id: c.perfil?.app_user_id ?? null, nome: q.nome }, oque, 'torre', vinc ? vinc.clientId : null);
-  if (vinc) await gravar(q.org, 'clientActions', [{ id: novoId('ca'), clientId: vinc.clientId, data: agora.slice(0, 10), quem: q.teamId, tipo: acao === 'pausar' ? `Pausou ${nivel}` : 'Orçamento alterado', area: 'trafego',
-    metrica: acao === 'pausar' ? null : 'Verba', descricao: oque.replace(/^\w/, (x) => x.toUpperCase()), antes, depois, expectativa: '', resultado: '', origem: 'torre', contaMeta: conta, objetoId: id, via: texto(b.via, 'via', { max: 120 }) || null, createdAt: agora, createdBy: c.perfil?.app_user_id ?? null }]);
+  // auditoria (decisão do dono, 25/11/2026): quem mudou, qual cliente, responsável do cliente e se é cliente de outra pessoa
+  const autorId = c.perfil?.app_user_id ?? null;
+  const resp = vinc?.respId ? await obter(q.org, 'team', vinc.respId) : null;
+  const deOutroGestor = !!(vinc?.respId && vinc.respId !== q.teamId);
+  const aud = { autorId, autorNome: q.nome, autorTeamId: q.teamId, respId: vinc?.respId ?? null, respNome: resp ? String(resp.nome ?? '') : null, deOutroGestor };
+  const nomeCli = vinc?.nome || `act_${conta}`;
+  const oqueBase = acao === 'pausar' ? `pausou ${ROT[nivel]} "${nome}" no Meta (Painel de Voo)` : `mudou o orçamento diário de ${ROT[nivel]} "${nome}" de ${antes} para ${depois} (Painel de Voo)`;
+  const oque = `${oqueBase} · ${nomeCli}${deOutroGestor ? ` — cliente de ${aud.respNome || 'outro gestor'}` : ''}`;
+  const caId = vinc ? novoId('ca') : null;
+  if (vinc) await gravar(q.org, 'clientActions', [{ id: caId, clientId: vinc.clientId, data: agora.slice(0, 10), quem: q.teamId, tipo: acao === 'pausar' ? `Pausou ${nivel}` : 'Orçamento alterado', area: 'trafego',
+    metrica: acao === 'pausar' ? null : 'Verba', descricao: oqueBase.replace(/^\w/, (x) => x.toUpperCase()), antes, depois, expectativa: '', resultado: '', origem: 'torre', contaMeta: conta, objetoId: id, via: texto(b.via, 'via', { max: 120 }) || null, createdAt: agora, createdBy: autorId, ...aud }]);
+  await gravar(q.org, 'activity', [{ id: novoId('act'), quem: autorId, quemNome: q.nome, oque, col: vinc ? 'clientActions' : 'torre', refId: caId, clientId: vinc?.clientId ?? null, quando: agora, ...aud }]);
+  if (vinc && deOutroGestor) {
+    // avisa o responsável do cliente e Dono/Admin (menos quem fez)
+    const users = await listar(q.org, 'users');
+    const para = [...new Set([resp?.userId as string | undefined, ...users.filter((u) => u.ativo !== false && ['dono', 'admin'].includes(String(u.papel))).map((u) => String(u.id))])].filter((x): x is string => !!x && x !== autorId);
+    if (para.length) await gravar(q.org, 'notifications', para.map((uid) => ({ id: novoId('not'), para: uid, de: autorId, tipo: 'alerta', prioridade: 'alta', canais: ['app'], lida: false, quando: agora,
+      titulo: `${q.nome} alterou ${nomeCli} — cliente de ${aud.respNome || 'outro gestor'}`, texto: `${oqueBase.replace(/^\w/, (x) => x.toUpperCase())}.`, link: `#/clientes/${vinc.clientId}/resultados-acoes`, refCol: 'clients', refId: vinc.clientId })));
+  }
 
   // libera a próxima busca ao vivo desta conta (o app busca de novo logo depois da ação)
   await adminClient().from('voo_cache').delete().eq('chave', `vivo:${c.userId}:${conta}`);

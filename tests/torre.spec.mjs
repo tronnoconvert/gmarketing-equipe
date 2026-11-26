@@ -155,24 +155,25 @@ export default async function (t) {
   ok(!/aguardando confirmação do Meta/.test(await page.textContent('#view')), 'busca seguinte confirmou: marca "aguardando" some');
   ok(await voo(a => window.AOS_VOO.statusCampanhas('9000000000000105') && window.AOS_VOO.modelo('9000000000000105').camps.some(c => c.sets.some(s => s.ads.some(x => x.id === a && x.st === 'PAUSED'))), ad), 'anúncio aparece pausado depois da confirmação');
 
-  step('Painel de Voo: orçamento com teto do cliente e limite de 10 por hora');
+  step('Painel de Voo: orçamento com teto do cliente, sem limite por hora, autoria auditada');
   await abrirConta('9000000000000106', 'campanhas');
   await page.$$eval('details.lv-s', l => l.forEach(d => { d.open = true; })); await page.waitForTimeout(100);
   const orcId = await page.$eval('[data-voo-orc]', b => b.dataset.vooOrc);
-  for (let k = 1; k <= 10; k++) {
+  const N_ORC = 6; // mais que o antigo limite de 4: nenhuma recusa por contagem (decisão do dono, 25/11/2026)
+  for (let k = 1; k <= N_ORC; k++) {
     await page.click(`[data-voo-orc="${orcId}"]`); await page.waitForSelector('.ov-modal [name="valor"]');
     await page.fill('.ov-modal [name="valor"]', k === 1 ? '900000' : String(4000 + k * 100));
-    if (k === 1) { await page.dispatchEvent('.ov-modal [name="valor"]', 'input'); ok(/Passa do teto do cliente/.test(await page.textContent('.ov-modal')), 'aviso "passa do teto do cliente" antes de confirmar'); ok(/Aumento acima de/.test(await page.textContent('.ov-modal')), 'aviso de aumento grande (aprendizado)'); }
+    if (k === 1) { await page.dispatchEvent('.ov-modal [name="valor"]', 'input'); ok(/Passa do teto do cliente/.test(await page.textContent('.ov-modal')), 'aviso "passa do teto do cliente" antes de confirmar'); ok(/Aumento acima de/.test(await page.textContent('.ov-modal')), 'aviso de aumento grande (aprendizado)'); ok(!/nesta hora/.test(await page.textContent('.ov-modal')), 'sem contador "mudanças nesta hora"'); }
     await page.click('.ov-modal [data-ok]'); await page.waitForSelector('.ov-modal [name="sim"]');
     await digitarSIM('SIM'); await page.click('.ov-modal [data-ok]'); await page.waitForSelector('.ov-modal', { state: 'detached', timeout: 5000 }); await page.waitForTimeout(700);
     await page.evaluate(() => document.querySelectorAll('.toasts > *, .toast').forEach(x => x.remove()));
   }
-  ok(await voo(() => window.AOS.db.count('clientActions', a => a.origem === 'torre' && a.tipo === 'Orçamento alterado')) === 10, '10 mudanças de orçamento registradas');
-  await page.waitForTimeout(300);
-  await page.click(`[data-voo-orc="${orcId}"]`); await page.waitForTimeout(400);
-  ok(!(await page.$('.ov-modal [name="valor"]')) && /no máximo 10 mudanças/.test(await page.textContent('#toasts')), '11ª mudança na mesma hora bloqueada');
-  let lim = null; try { await voo(o => window.AOS_VOO.executarAcao({ acao: 'orcamento', nivel: 'campanha', id: o, conta: '9000000000000106', valor: 777 }), orcId); } catch (e) { lim = String(e.message); }
-  ok(lim && /no máximo 10/.test(lim), 'limite também na camada de envio (não só no botão)');
+  ok(await voo(() => window.AOS.db.count('clientActions', a => a.origem === 'torre' && a.tipo === 'Orçamento alterado')) === N_ORC, `${N_ORC} mudanças de orçamento na mesma hora, nenhuma bloqueada`);
+  const ultima = await voo(() => window.AOS.db.list('clientActions', a => a.tipo === 'Orçamento alterado').pop());
+  ok(ultima && ultima.autorId === 'u-gabriel' && ultima.autorNome && ultima.respId, `histórico grava autor e responsável do cliente (${ultima && ultima.autorNome} · resp ${ultima && ultima.respNome})`);
+  ok(await voo(() => window.AOS.db.list('activity', a => a.col === 'clientActions' && a.autorId === 'u-gabriel' && a.clientId).length >= 1), 'auditoria (activity) com autor e cliente');
+  let semLim = null; try { await voo(o => window.AOS_VOO.executarAcao({ acao: 'orcamento', nivel: 'campanha', id: o, conta: '9000000000000106', valor: 777 }), orcId); semLim = 'ok'; } catch (e) { semLim = String(e.message); }
+  ok(semLim === 'ok', `camada de envio também sem limite por hora (${semLim})`);
 
   step('Painel de Voo: pedir criativo e avisar cliente');
   await abrirConta('9000000000000105');
@@ -232,6 +233,8 @@ export default async function (t) {
   ok(await page.$eval('[data-nova-rotina]', b => b.disabled), 'Nova rotina desabilitada');
 
   step('Painel de Voo da Ana (gestora): abre em "Meus clientes", vê todas as contas vinculadas, sem receita');
+  // cliente de outro gestor (o demo tem só a Ana como gestora): Auto Center passa a ser do Allan
+  await voo(() => window.AOS.db.update('clients', 'c-autocenter', { respId: 't-allan', equipe: ['t-allan'] }));
   await t.ir('#/torre/voo'); await page.waitForSelector('.m-voo-contas tbody tr', { timeout: 6000 });
   const esperadas = await voo(() => { const db = window.AOS.db; const ids = new Set(db.list('clients', c => c.respId === 't-ana' || (c.equipe || []).includes('t-ana')).flatMap(c => c.metaContas || [])); return ids.size; });
   ok((await page.$$('.m-voo-contas tbody tr')).length === esperadas && esperadas > 0 && esperadas < 17, `abre em "Meus clientes": só as contas dos clientes dela (${esperadas})`);
@@ -243,6 +246,30 @@ export default async function (t) {
   const alheia = await voo(() => { const c = window.AOS.db.list('clients', c => (c.metaContas || []).length && c.respId !== 't-ana' && !(c.equipe || []).includes('t-ana'))[0]; return String(c.metaContas[0]).replace(/\D/g, ''); });
   await abrirConta(alheia, 'campanhas');
   ok(!/não está no seu Painel de Voo/.test(await page.textContent('#view')) && !!(await page.$('[data-voo-pausar],[data-voo-orc]')), 'gestora abre e pode agir na conta de cliente de outro responsável');
+  step('Ana muda a verba de cliente de outro gestor: marcado, notificado e filtrável');
+  const cliAlheio = await voo(c => window.AOS.db.list('clients', x => (x.metaContas || []).some(m => String(m).replace(/\D/g, '') === c))[0], alheia);
+  const respUser = await voo(id => (window.AOS.db.get('team', id) || {}).userId, cliAlheio.respId);
+  const nNotif0 = await voo(u => window.AOS.db.count('notifications', n => n.para === u && /cliente de/.test(n.titulo || '')), respUser);
+  await page.$$eval('details.lv-s', l => l.forEach(d => { d.open = true; })); await page.waitForTimeout(100);
+  const orcA = await page.$eval('[data-voo-orc]', b => b.dataset.vooOrc);
+  await page.click(`[data-voo-orc="${orcA}"]`); await page.waitForSelector('.ov-modal [name="valor"]');
+  await page.fill('.ov-modal [name="valor"]', '123'); await page.click('.ov-modal [data-ok]'); await page.waitForTimeout(500); console.log('DBG', (await page.textContent('body')).slice(-600)); await page.waitForSelector('.ov-modal [name="sim"]');
+  await digitarSIM('SIM'); await page.click('.ov-modal [data-ok]'); await page.waitForSelector('.ov-modal', { state: 'detached', timeout: 5000 }); await page.waitForTimeout(500);
+  const caA = await voo(id => window.AOS.db.list('clientActions', a => a.clientId === id && a.autorId === 'u-ana').pop(), cliAlheio.id);
+  ok(caA && caA.deOutroGestor === true && caA.respId === cliAlheio.respId && caA.autorNome, 'ação da Ana marcada deOutroGestor com autor e responsável');
+  ok(await voo(id => window.AOS.db.list('activity', a => a.clientId === id && a.quem === 'u-ana' && a.deOutroGestor === true).length === 1, cliAlheio.id), 'auditoria marcada "cliente de outro gestor"');
+  ok(await voo(u => window.AOS.db.count('notifications', n => n.para === u && /cliente de/.test(n.titulo || '')), respUser) === nNotif0 + 1, 'responsável do cliente notificado');
+  ok(await voo(() => window.AOS.db.count('notifications', n => n.para === 'u-gabriel' && n.de === 'u-ana' && /cliente de/.test(n.titulo || ''))) >= 1, 'dono também notificado');
+  await t.ir(`#/clientes/${cliAlheio.id}/resultados-acoes`); await page.waitForTimeout(400);
+  ok(/Ana alterou a verba — cliente de/.test(await page.textContent('#view')), 'histórico do cliente: "Ana alterou a verba — cliente de …"');
+  await t.ir('#/equipe/atividade?outro=1'); await page.waitForTimeout(400);
+  ok(/Alterações em clientes de outro gestor/.test(await page.textContent('#view')) && /Cliente de outro gestor/.test(await page.textContent('#view')), 'Equipe › Atividade: filtro "Alterações em clientes de outro gestor"');
+  await t.sair(); await t.login();
+  await t.ir('#/admin/auditoria?per=tudo&outro=1'); await page.waitForTimeout(400);
+  const audRows = await page.$$eval('.m-aud-f ~ * tbody tr, table tbody tr', l => l.map(r => r.textContent));
+  ok(audRows.length >= 1 && audRows.every(x => /cliente de/.test(x)) && audRows.some(x => /Ana/.test(x)), `Auditoria: filtro "Alterações em clientes de outro gestor" (${audRows.length})`);
+  await t.sair(); await t.login('ana@agencia.demo');
+
   ok(!(await page.$('.m-voo-vincs')), 'sem "Contas sem cliente vinculado" para gestor');
   ok(await voo(() => window.AOS_VOO.estado.geral.linhas.every(l => l[10] == null) && window.AOS_VOO.estado.geral.veReceita === false), 'pacote sem valores de receita (faturamento)');
   await abrirConta('9000000000000107');
